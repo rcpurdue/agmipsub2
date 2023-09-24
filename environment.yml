@@ -1,0 +1,13 @@
+name: nbtmpl
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - ipykernel
+  - ipywidgets
+  - jupyterlab
+  - jupyterthemes
+  - matplotlib
+  - pandas
+  - python=3.8
+  - voila
