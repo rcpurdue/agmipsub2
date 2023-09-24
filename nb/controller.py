@@ -27,11 +27,8 @@ def start(debug=False):
     model.start()  # Load data or prepare access to data
     view.start(debug)  # Build user interface (specify "True" to show log under UI)
 
-    # Show data preview
-    with view.data_preview_out:
-        display(model.data)
-
     # Setup callbacks
+    """
     try:
         # Connect UI widgets to callback methods ("cb_...").
         # These methods will be run when user changes a widget.
@@ -45,7 +42,7 @@ def start(debug=False):
     except Exception:
         logger.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
         raise
-
+    """    
 
 def when_fill_results_export(_):
     """React to user pressing button to download results."""

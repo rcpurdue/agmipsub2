@@ -16,38 +16,15 @@ from nb.log import logger, log_handler
 # - Bound attributes: https://www.oreilly.com/library/view/python-cookbook/0596001673/ch05s16.html
 
 # General
-APP_TITLE = 'Land-Ocean Temperature Index'
+APP_TITLE = 'AgMIP GlobalEcon Data Submission'
 CSS_JS_HTML = 'nb/custom.html'
 LOGO_IMAGE = 'nb/logo.png'
 ALL = 'All'
 EMPTY = ''
 NO_DATA_MSG = '''<br>(There's no data to display.)'''
-TAB_TITLES = ['Welcome', 'Data', 'Selection', 'Visualize', 'Settings']
+TAB_TITLES = ['1. Upload File', '2. Specify Data', '3. Check Integrity', '4. Check Plausibility', 'View Activity']
 PLOT_TITLE = 'Land-Ocean Temperature Index'
-
-# Welcome tab
-USING_TITLE = 'Using This App'
-USING_TEXT = '''<p>
-In the <b>Data</b> tab above, you can review the dataset.
-In the <b>Selection</b> tab, you can search for and download data of interest.
-Once you've selected data, generate plots in the <b>Visualize</b> tab.
-</p>'''
-SOURCES_TITLE = 'Data Sources'
-SOURCES_TEXT = '''<p>
-<b>Land-Ocean Temperature Index</b>
-<a href="https://climate.nasa.gov/vital-signs/global-temperature/"
-target="_blank">Global Temperature (NASA)</a>
-,
-<a href="https://data.giss.nasa.gov/gistemp/"
-target="_blank">GISS Surface Temperature Analysis (NASA)</a>
-</p><p>
-This site is based on data downloaded from the following site on 2020-07-14:
-<a href="https://data.giss.nasa.gov/gistemp/graphs/graph_data/Global_Mean_Estimates_based_on_Land_and_Ocean_Data/graph.txt"  # noqa
-target="_blank">Global Mean Estimates based on Land_and Ocean Data (NASA)</a>
-<br>
-The code behind this site is intended as a template for anyone wanting to develop similar appliations. Source code
-is available <a href="https://github.com/rcpurdue/nbtmpl" target="_blank">here</a>.
-</p>'''
+COLS = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year', 'Value']
 
 # Data tab
 PREVIEW_SECTION_TITLE = 'Data'
@@ -139,7 +116,7 @@ def start(show_log):
 
     # Build conent (widgets) for each tab
     tab_content = []
-    tab_content.append(view.build_welcome_tab())
+    tab_content.append(view.build_upload_tab())
     tab_content.append(view.build_data_tab())
     tab_content.append(view.build_selection_tab())
     tab_content.append(view.build_visualize_tab())
@@ -176,19 +153,69 @@ def new_section(title, contents):
     return ret
 
 
-def build_welcome_tab():
-    '''Create widgets for introductory tab content'''
+def build_upload_tab():
+    '''Create widgets for upload tab content.'''
     content = []
-    content.append(view.new_section(USING_TITLE, USING_TEXT))
-    content.append(view.new_section(SOURCES_TITLE, SOURCES_TEXT))
+    # See https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20List.html#file-upload
+    view.uploader = widgets.FileUpload()
+    view.project = widgets.Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
+    content.append(view.new_section('a) Upload a file', [view.uploader]))
+    content.append(view.new_section('b) Select a project', [view.project]))
     return widgets.VBox(content)
 
+def desc_width_auto(widget_list):
+    for widget in widget_list:
+        widget.style.description_width = 'auto'
+
+def set_width(widget_list, pixels):
+    for widget in widget_list:
+        widget.layout = widgets.Layout(width=f"{pixels}px")
 
 def build_data_tab():
-    '''Show data tab content'''
-    view.data_preview_out = widgets.Output()
-    return view.new_section(PREVIEW_SECTION_TITLE, [view.data_preview_out])
+    '''Create widgets for data tab content.'''
+    content = []
 
+    # Specify...
+    view.model_ddn = widgets.Dropdown(description='Model')
+    view.header_ckb = widgets.Checkbox(description='Header row')
+    view.skip_txt = widgets.IntText(description='Num. lines to skip')
+    view.delim_ddn = widgets.Dropdown(description='Delimiter')
+    view.scen_ignore_txt = widgets.Textarea(
+        description='Ignore scenarios',
+        placeholder="(Optional) Enter comma-separated scenario values"
+    )
+    widget_list = [view.model_ddn, view.header_ckb, view.skip_txt, view.delim_ddn, view.scen_ignore_txt]
+    view.desc_width_auto(widget_list)
+    content.append(view.new_section('Assign columns from input data to output data', widget_list))
+    
+    # Assign...
+    cols = [widgets.Label(value=col) for col in COLS]
+    view.set_width(cols, pixels=140)
+    view.model_lbl = widgets.Label(value='TODO')
+    view.scen_col_ddn = widgets.Dropdown()
+    view.reg_col_ddn = widgets.Dropdown()
+    view.var_col_ddn = widgets.Dropdown()
+    view.item_col_ddn = widgets.Dropdown()
+    view.unit_col_ddn = widgets.Dropdown()
+    view.year_col_ddn = widgets.Dropdown()
+    view.val_col_ddn = widgets.Dropdown()
+    widget_list = [view.model_lbl, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
+                   view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
+    view.set_width(widget_list, pixels=140)
+    content.append(view.new_section('Assign columns from input data to output data', [widgets.VBox([widgets.HBox(cols), 
+                                                                                                   widgets.HBox(widget_list)])]))
+    
+    # Input preview
+    labels = [widgets.Label(value='TODO', layout=widgets.Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+    view.input_preview_grid = widgets.GridBox(children=labels, layout=widgets.Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    content.append(view.new_section('Input preview', [view.input_preview_grid]))
+
+    # Output preview
+    labels = [widgets.Label(value='TODO', layout=widgets.Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+    view.output_preview_grid = widgets.GridBox(children=labels, layout=widgets.Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    content.append(view.new_section('Output preview', [view.output_preview_grid]))
+
+    return widgets.VBox(content)
 
 def build_selection_tab():
     '''Create widgets for selection tab content'''
