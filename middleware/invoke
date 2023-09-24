@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# TODO Change "anaconda-agmipsub2" below to correct conda env name
+/usr/bin/invoke_app "$@" -t agmipsub2 \
+                         -C "start_jupyter -A -T @tool notebook.ipynb" \
+                         -u anaconda-agmipsub2
