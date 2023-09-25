@@ -1,20 +1,16 @@
 # controller.py - Central logic for app
 # rcampbel@purdue.edu - 2020-07-14
-
 import logging
 import sys
 import traceback
 from IPython.display import display, clear_output, FileLink
 from jupyterthemes import jtplot
 from matplotlib import pyplot as plt
-
 from nb import model
 from nb import view
 from nb.log import logger, log_handler
 
-
 ctrl = sys.modules[__name__]
-
 
 def start(debug=False):
     """Begin running the app."""
@@ -83,7 +79,7 @@ def when_plot_type_selected(_):
     """React to use requesting plot."""
     try:
 
-        if not view.plot_ddn.value == view.EMPTY:
+        if not view.plot_ddn.value == '':
             view.plot_output.clear_output(wait=True)
             # TODO Add ability to download plot as an image
 
@@ -123,7 +119,7 @@ def refresh_select_output():
     if model.res_count > 0:
 
         # Calc set output line limit
-        if view.select_ddn_ndisp.value == view.ALL:
+        if view.select_ddn_ndisp.value == 'All':
             limit = model.res_count
         else:
             limit = int(view.select_ddn_ndisp.value)
@@ -138,7 +134,7 @@ def refresh_select_output():
 
         # Enable plot
         view.plot_ddn.disabled = False
-        view.plot_ddn.options = [view.EMPTY]+model.headers[1:]
+        view.plot_ddn.options = ['']+model.headers[1:]
     else:
         view.set_no_data()  # Show "empty list" msg
         view.plot_ddn.disabled = True

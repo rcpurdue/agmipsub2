@@ -1,12 +1,10 @@
 # model.py - Storage access for app
 # rcampbel@purdue.edu - 2020-07-14
-
 import os
 import csv
 import glob
 import sys
 import pandas as pd
-
 from nb.log import logger
 
 DATA_DIR = 'data'

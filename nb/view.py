@@ -1,300 +1,167 @@
 # view.py - User interface for app
 # rcampbel@purdue.edu - 2020-07-14
-
 import sys
-import ipywidgets as widgets
-from IPython.display import HTML, display, clear_output
-
+from IPython.display import display, clear_output
+from ipywidgets import \
+    Accordion, Checkbox,  Dropdown, FileUpload, GridBox, HBox, IntText, Label, \
+    Layout, Output, HTML, Image, ToggleButtons, Select, Tab, Text, Textarea, VBox 
 from nb.log import logger, log_handler
 
-
-"""Store app-wide constants, including values and language text."""
-
-# NOTE Simple language string definiitions below: for better features, consider using the following:
-# - Multilingual internationalization: https://docs.python.org/2/library/gettext.html
-# - Data classes: https://docs.python.org/3/library/dataclasses.html
-# - Bound attributes: https://www.oreilly.com/library/view/python-cookbook/0596001673/ch05s16.html
-
-# General
-APP_TITLE = 'AgMIP GlobalEcon Data Submission'
-CSS_JS_HTML = 'nb/custom.html'
-LOGO_IMAGE = 'nb/logo.png'
-ALL = 'All'
-EMPTY = ''
-NO_DATA_MSG = '''<br>(There's no data to display.)'''
-TAB_TITLES = ['1. Upload File', '2. Specify Data', '3. Check Integrity', '4. Check Plausibility', 'View Activity']
-PLOT_TITLE = 'Land-Ocean Temperature Index'
 COLS = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year', 'Value']
-
-# Data tab
-PREVIEW_SECTION_TITLE = 'Data'
-EXPORT_LINK_PROMPT = "Click here to save file: "
-
-# Selection tab
-CRITERIA_TITLE = 'Selection Criteria'
-CRITERIA_APPLY = 'Select'
-OUTPUT_TITLE = 'Results'
-OUTPUT_PRE = 'Limit to '
-OUTPUT_POST = 'lines'
-EXPORT_TITLE = 'Export'
-EXPORT_BUTTON = 'Create Download Link'
-START_YEAR = 'From Year'
-END_YEAR = 'To Year'
-
-# Visualize tab
-NOTE_TITLE = 'Note'
-NOTE_TEXT = 'The plot is based on results from the Selection tab.'
-PLOT_TITLE = 'Plot'
-PLOT_LABEL = 'Select data field'
-
-# Setting tab
-PLOT_SETTINGS_SECTION_TITLE = 'Plot Settings'
-THEME = 'Theme'
-THEMES = ['onedork', 'grade3', 'oceans16', 'chesterish', 'monokai', 'solarizedl', 'solarizedd']
-CONTEXT = 'Context'
-CONTEXTS = ['paper', 'notebook', 'talk', 'poster']
-FONT_SCALE = 'Font Scale'
-SPINES = 'Spines'
-GRIDLINES = 'Gridlines'
-TICKS = 'Ticks'
-GRID = 'Grid'
-FIG_WIDTH = 'Width'
-FIG_HEIGHT = 'Height'
-APPLY = 'Apply'
-
-LO10 = widgets.Layout(width='10%')
-LO15 = widgets.Layout(width='15%')
-LO20 = widgets.Layout(width='20%')
-
 view = sys.modules[__name__]
-
-# The view's "public" attributes are listed here, with type hints, for quick reference
-
-# Filer ("Selection" tab) controls
-select_txt_startyr: widgets.Text
-select_txt_endyr: widgets.Text
-select_btn_apply: widgets.Button
-select_ddn_ndisp: widgets.Dropdown
-select_output: widgets.Output
-select_btn_refexp: widgets.Button
-select_out_export: widgets.Output
-
-# Plot ("Visualize" tab) controls
-plot_ddn: widgets.Dropdown
-plot_output: widgets.Output
-
-# Settings controls
-theme: widgets.Dropdown
-context: widgets.Dropdown
-fscale: widgets.FloatSlider
-spines: widgets.Checkbox
-gridlines: widgets.Text
-ticks: widgets.Checkbox
-grid: widgets.Checkbox
-figsize1: widgets.FloatSlider
-figsize2: widgets.FloatSlider
-apply: widgets.Button
 
 
 def start(show_log):
     """Build the user interface."""
+    display(HTML(filename='nb/custom.html'))  # Send CSS code down to browser
+    
+    # Title
+    app_title = HTML('AgMIP GlobalEcon Data Submission')
+    app_title.add_class('app_title') 
 
-    # Send app's custom styles (CSS code) down to the browser
-    display(HTML(filename=CSS_JS_HTML))
+    # Logo
+    with open('nb/logo.png', "rb") as logo_file:
+        logo = Image(value=logo_file.read(), format='png', layout={'max_height': '32px'})
 
-    # Create large title for app
-    app_title = widgets.HTML(APP_TITLE)
-    app_title.add_class('app_title')  # Example of custom widget style via CSS, see custom.html
+    # Tabs
 
-    # Create app logo - example of using exposed layout properties
-    with open(LOGO_IMAGE, "rb") as logo_file:
-        logo = widgets.Image(value=logo_file.read(), format='png', layout={'max_height': '32px'})
+    tabs = Tab(children=[upload_tab(), data_tab(),
+                         integrity_tab(), plausibility_tab(),
+                         activity_tab()])
 
-    # Create tabs and fill with UI content (widgets)
+    for i, text in enumerate(['1. Upload file', '2. Specify format', '3. Check integrity', 
+                                   '4. Check plausibility', 'View activity']):
+        tabs.set_title(i, text)
 
-    tabs = widgets.Tab()
-
-    # Build conent (widgets) for each tab
-    tab_content = []
-    tab_content.append(view.build_upload_tab())
-    tab_content.append(view.build_data_tab())
-    tab_content.append(view.build_selection_tab())
-    tab_content.append(view.build_visualize_tab())
-    tab_content.append(view.build_settings_tab())
-
-    tabs.children = tuple(tab_content)  # Fill tabs with content
-
-    # Add title text for each tab
-    for i, tab_title in enumerate(TAB_TITLES):
-        tabs.set_title(i, tab_title)
-
-    # Show the app
-    header = widgets.HBox([app_title, logo])
-    header.layout.justify_content = 'space-between'  # Example of custom widget layout
-    display(widgets.VBox([header, tabs]))
+    # Show app
+    header = HBox([app_title, logo])
+    header.layout.justify_content = 'space-between'
+    display(VBox([header, tabs]))
     logger.info('UI build completed')
 
-    # Optionally, display a widget that shows the log items
-    # Log items always appear in Jupyter Lab's log.
-    # However, this addl. log widget is useful in some contexts (e.g. HUBzero tools)
     if show_log:
+        # Duplicate log lines in log widget (they always show in Jupyter Lab log)
         display(log_handler.log_output_widget)
 
 
-def new_section(title, contents):
-    '''Utility method that create a collapsible widget container'''
+def section(title, contents, desc=None):
+    '''Create collapsible container with title, optional desc.'''
+    if desc is not None:
+        contents = [HTML(value=desc)] + contents
 
-    if type(contents) == str:
-        contents = [widgets.HTML(value=contents)]
-
-    ret = widgets.Accordion(children=tuple([widgets.VBox(contents)]))
+    ret = Accordion(children=tuple([VBox(contents)]))
     ret.set_title(0, title)
     ret.selected_index = 0
     return ret
 
 
-def build_upload_tab():
+def upload_tab():
     '''Create widgets for upload tab content.'''
     content = []
-    # See https://ipywidgets.readthedocs.io/en/stable/examples/Widget%20List.html#file-upload
-    view.uploader = widgets.FileUpload()
-    view.project = widgets.Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
-    content.append(view.new_section('a) Upload a file', [view.uploader]))
-    content.append(view.new_section('b) Select a project', [view.project]))
-    return widgets.VBox(content)
+    # See https://ipyreadthedocs.io/en/stable/examples/Widget%20List.html#file-upload
+    view.uploader = FileUpload()
+    view.project = Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
+    content.append(section('a) Select file for upload', [view.uploader]))
+    content.append(section('b) Select project', [view.project]))
+    return VBox(content)
 
-def desc_width_auto(widget_list):
-    for widget in widget_list:
-        widget.style.description_width = 'auto'
+def set_width(widgets, width='auto', desc=False):
+    """Set width for widgets' layouts or descriptions."""
+    for widget in widgets:
+    
+        if desc:
+            widget.style.description_width = width
+        else:
+            widget.layout = Layout(width=width)
 
-def set_width(widget_list, pixels):
-    for widget in widget_list:
-        widget.layout = widgets.Layout(width=f"{pixels}px")
-
-def build_data_tab():
+def data_tab():
     '''Create widgets for data tab content.'''
     content = []
 
     # Specify...
-    view.model_ddn = widgets.Dropdown(description='Model')
-    view.header_ckb = widgets.Checkbox(description='Header row')
-    view.skip_txt = widgets.IntText(description='Num. lines to skip')
-    view.delim_ddn = widgets.Dropdown(description='Delimiter')
-    view.scen_ignore_txt = widgets.Textarea(
+    view.model_ddn = Dropdown(description='Model')
+    view.delim_ddn = Dropdown(description='Delimiter')
+    view.header_ckb = Checkbox(description='Header row')
+    view.skip_txt = IntText(description='Num. lines to skip')
+    view.scen_ignore_txt = Textarea(
         description='Ignore scenarios',
-        placeholder="(Optional) Enter comma-separated scenario values"
-    )
-    widget_list = [view.model_ddn, view.header_ckb, view.skip_txt, view.delim_ddn, view.scen_ignore_txt]
-    view.desc_width_auto(widget_list)
-    content.append(view.new_section('Assign columns from input data to output data', widget_list))
+        placeholder="(Optional) Enter comma-separated scenario values",
+        layout=Layout(width='100%'))
+    set_width([view.model_ddn, view.delim_ddn, view.header_ckb, view.skip_txt, view.scen_ignore_txt], desc=True)
+    content = [section('a) Assign columns from input data to output data',
+                       [VBox(layout=Layout(width='60%'), 
+                             children=[HBox([view.model_ddn, view.delim_ddn,]),
+                                       HBox([view.header_ckb, view.skip_txt]),
+                                       view.scen_ignore_txt])])]
     
     # Assign...
-    cols = [widgets.Label(value=col) for col in COLS]
-    view.set_width(cols, pixels=140)
-    view.model_lbl = widgets.Label(value='TODO')
-    view.scen_col_ddn = widgets.Dropdown()
-    view.reg_col_ddn = widgets.Dropdown()
-    view.var_col_ddn = widgets.Dropdown()
-    view.item_col_ddn = widgets.Dropdown()
-    view.unit_col_ddn = widgets.Dropdown()
-    view.year_col_ddn = widgets.Dropdown()
-    view.val_col_ddn = widgets.Dropdown()
-    widget_list = [view.model_lbl, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
-                   view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
-    view.set_width(widget_list, pixels=140)
-    content.append(view.new_section('Assign columns from input data to output data', [widgets.VBox([widgets.HBox(cols), 
-                                                                                                   widgets.HBox(widget_list)])]))
+    cols = [Label(value=col) for col in COLS]
+    set_width(cols, '140px')
+    view.model_lbl = Label(value='TODO')
+    view.scen_col_ddn = Dropdown()
+    view.reg_col_ddn = Dropdown()
+    view.var_col_ddn = Dropdown()
+    view.item_col_ddn = Dropdown()
+    view.unit_col_ddn = Dropdown()
+    view.year_col_ddn = Dropdown()
+    view.val_col_ddn = Dropdown()
+    widgets = [view.model_lbl, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
+               view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
+    set_width(widgets, '140px')
+    content += [section('b) Assign columns from input data to output data', [VBox([HBox(cols), HBox(widgets)])])]
     
     # Input preview
-    labels = [widgets.Label(value='TODO', layout=widgets.Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
-    view.input_preview_grid = widgets.GridBox(children=labels, layout=widgets.Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
-    content.append(view.new_section('Input preview', [view.input_preview_grid]))
+    labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+    view.inp_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    content += [section('c) Review input preview', [view.inp_grid])]
 
     # Output preview
-    labels = [widgets.Label(value='TODO', layout=widgets.Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
-    view.output_preview_grid = widgets.GridBox(children=labels, layout=widgets.Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
-    content.append(view.new_section('Output preview', [view.output_preview_grid]))
+    labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+    view.out_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    content += [section('d) Review output preview', [view.out_grid])]
 
-    return widgets.VBox(content)
+    return VBox(content)
 
-def build_selection_tab():
-    '''Create widgets for selection tab content'''
-    view.select_txt_startyr = widgets.Text(description=START_YEAR, value='', placeholder='')
-    view.select_txt_endyr = widgets.Text(description=END_YEAR, value='', placeholder='')
-    view.select_btn_apply = widgets.Button(description=CRITERIA_APPLY, icon='select', layout=view.LO20)
-    view.select_ddn_ndisp = widgets.Dropdown(options=['25', '50', '100', ALL], layout=view.LO10)
-    view.select_output = widgets.Output()
-    view.select_btn_refexp = widgets.Button(description=EXPORT_BUTTON, icon='download',
-                                            layout=view.LO20)
-    view.select_out_export = widgets.Output(layout={'border': '1px solid black'})
-    content = []
+def integrity_tab():
+    "Create widgets for integrity tab content."
 
-    # Section: Selection criteria
-    section_list = []
-    section_list.append(view.select_txt_startyr)
-    section_list.append(view.select_txt_endyr)
-    section_list.append(view.select_btn_apply)
-    content.append(view.new_section(CRITERIA_TITLE, section_list))
+    # Rows overview
+    view.struct_probs_int = Text(description='Structural problems (e.g. missing fields)', disabled=True)
+    view.ignored_scens_int = Text(description='Ignored scenarios', disabled=True)
+    view.dupes_int = Text(description='Duplicate records', disabled=True)
+    view.accepted_int = Text(description='Accepted records', disabled=True)
+    widgets = [view.struct_probs_int, view.ignored_scens_int, view.dupes_int, view.accepted_int]
+    set_width(widgets, '360px')
+    set_width(widgets, '300px',  desc=True)
+    content =[section('a) Review analysis', widgets, 'Classifications and row counts:')]
 
-    # Section: Output (with apply button)
-    section_list = []
-    row = []
-    row.append(widgets.HTML('<div style="text-align: right;">'+OUTPUT_PRE+'</div>', layout=view.LO15))
-    row.append(view.select_ddn_ndisp)
-    row.append(widgets.HTML('<div style="text-align: left;">' + OUTPUT_POST + '</div>', layout=view.LO10))
-    section_list.append(widgets.HBox(row))
-    section_list.append(widgets.HBox([view.select_output]))  # NOTE Use "layout={'width': '90vw'}" to widen
-    content.append(view.new_section(OUTPUT_TITLE, section_list))
+    # Bad labels
+    view.bad_lbls_out = Output()
+    content += [section('b) Review bad labels', [view.bad_lbls_out], 'Non-standard labels that will be fixed automatically: ')]
+    
+    # Unknonw labels
+    view.unknown_lbls_out = Output()    
+    content += [section('c) Address unknow labels', [view.unknown_lbls_out],
+                        'NOTE: Records with labels left as-is will be DELETED. \
+                         (Fixed labels will be updated. Overriden labels place submission in "pending" status.)')]    
+    
+    return VBox(content)
 
-    # Section: Export (download)
-    section_list = []
-    section_list.append(widgets.VBox([view.select_btn_refexp, view.select_out_export]))
-    content.append(view.new_section(EXPORT_TITLE, section_list))
+def plausibility_tab():
+    "Create widgets for plausibility tab content."
+    view.plot_scen_ddn = Dropdown(description='Scenario')
+    view.plot_reg_ddn = Dropdown(description='Region')
+    view.plot_var_ddn = Dropdown(description='Variable')
+    widgets = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn]
+    set_width(widgets, '200px')
+    set_width(widgets, '75px', desc=True)
+    view.plot_type_rb = ToggleButtons(options=['Value trends', 'Growth trends'],
+                                     layout=Layout(margin='0 0 0 100px'))
+    widgets.append(view.plot_type_rb)
+    view.plot_area = Output()
+    return(section('a) Review plots', [VBox([HBox(widgets), view.plot_area])], 'Visualize uploaded data to verify its plausibility.'))
 
-    return widgets.VBox(content)
-
-
-def build_visualize_tab():
-    '''Create widgets for visualize tab content'''
-    content = []
-    content.append(view.new_section(NOTE_TITLE, NOTE_TEXT))
-    view.plot_ddn = widgets.Dropdown(options=[EMPTY], value=None, disabled=True)
-    view.plot_output = widgets.Output()
-    section_list = []
-
-    row = []
-    row.append(widgets.HTML(value=PLOT_LABEL))
-    row.append(widgets.Label(value='', layout=widgets.Layout(width='60%')))  # Cheat: spacer
-    section_list.append(widgets.HBox(row))
-    section_list.append(view.plot_ddn)
-    section_list.append(view.plot_output)
-    content.append(view.new_section(PLOT_TITLE, section_list))
-
-    return widgets.VBox(content)
-
-
-def build_settings_tab():
-    """Create widgets for settings tab."""
-    view.theme = widgets.Dropdown(description=THEME, options=THEMES)
-    view.context = widgets.Dropdown(description=CONTEXT, options=CONTEXTS)
-    view.fscale = widgets.FloatSlider(description=FONT_SCALE, value=1.4)
-    view.spines = widgets.Checkbox(description=SPINES, value=False)
-    view.gridlines = widgets.Text(description=GRIDLINES, value='--')
-    view.ticks = widgets.Checkbox(description=TICKS, value=True)
-    view.grid = widgets.Checkbox(description=GRID, value=False)
-    view.figsize1 = widgets.FloatSlider(description=FIG_WIDTH, value=6)
-    view.figsize2 = widgets.FloatSlider(description=FIG_HEIGHT, value=4.5)
-    view.apply = widgets.Button(description=APPLY)
-
-    return(view.new_section(PLOT_SETTINGS_SECTION_TITLE,
-                            [view.theme, view.context, view.fscale, view.spines, view.gridlines,
-                             view.ticks, view.grid, view.figsize1, view.figsize2, view.apply]))
-
-
-def set_no_data():
-    """Indicate there are no results."""
-    # NOTE While the other view methods build the UI, this one acts an example of a helper method
-
-    with view.select_output:
-        clear_output(wait=True)
-        display(widgets.HTML(NO_DATA_MSG))
+def activity_tab():
+    "Create widgets for activity tab content."
+    view.activity_out = Output()
+    return(section('Review Submissions', [view.activity_out]))
