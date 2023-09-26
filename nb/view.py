@@ -5,6 +5,8 @@ from IPython.display import display, clear_output
 from ipywidgets import \
     Accordion, Checkbox,  Dropdown, FileUpload, GridBox, HBox, IntText, Label, \
     Layout, Output, HTML, Image, ToggleButtons, Select, Tab, Text, Textarea, VBox 
+import ipyuploads
+from nb import controller as ctrl
 from nb.log import logger, log_handler
 
 COLS = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year', 'Value']
@@ -29,7 +31,7 @@ def start(show_log):
                          integrity_tab(), plausibility_tab(),
                          activity_tab()])
 
-    for i, text in enumerate(['1. Upload file', '2. Specify format', '3. Check integrity', 
+    for i, text in enumerate(['1. Upload file', '2. Create submission', '3. Check integrity', 
                                    '4. Check plausibility', 'View activity']):
         tabs.set_title(i, text)
 
@@ -54,17 +56,6 @@ def section(title, contents, desc=None):
     ret.selected_index = 0
     return ret
 
-
-def upload_tab():
-    '''Create widgets for upload tab content.'''
-    content = []
-    # See https://ipyreadthedocs.io/en/stable/examples/Widget%20List.html#file-upload
-    view.uploader = FileUpload()
-    view.project = Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
-    content.append(section('a) Select file for upload', [view.uploader]))
-    content.append(section('b) Select project', [view.project]))
-    return VBox(content)
-
 def set_width(widgets, width='auto', desc=False):
     """Set width for widgets' layouts or descriptions."""
     for widget in widgets:
@@ -74,30 +65,40 @@ def set_width(widgets, width='auto', desc=False):
         else:
             widget.layout = Layout(width=width)
 
+def upload_tab():
+    '''Create widgets for upload tab content.'''
+    content = []
+    view.uploader = ipyuploads.Upload(accept='*', multiple=False, all_files_complete=ctrl.when_upload_copleted)
+    view.file_info = Label(layout=Layout(margin='0 0 0 50px'))
+    content.append(section('a) Select file for upload', [HBox([view.uploader, view.file_info])]))
+    view.project = Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
+    content.append(section('b) Select project', [view.project]))
+    return VBox(content)
+
 def data_tab():
     '''Create widgets for data tab content.'''
-    content = []
 
-    # Specify...
-    view.model_ddn = Dropdown(description='Model')
-    view.delim_ddn = Dropdown(description='Delimiter')
-    view.header_ckb = Checkbox(description='Header row')
+    # Upload parsing options
     view.skip_txt = IntText(description='Num. lines to skip')
-    view.scen_ignore_txt = Textarea(
+    view.delim_ddn = Dropdown(description='Delimiter')
+    view.header_ddn = Dropdown(description='Had header row', options=[('Yes', True), ('No', False)])
+    view.scen_ignore_txt = Text(
         description='Ignore scenarios',
         placeholder="(Optional) Enter comma-separated scenario values",
-        layout=Layout(width='100%'))
-    set_width([view.model_ddn, view.delim_ddn, view.header_ckb, view.skip_txt, view.scen_ignore_txt], desc=True)
-    content = [section('a) Assign columns from input data to output data',
-                       [VBox(layout=Layout(width='60%'), 
-                             children=[HBox([view.model_ddn, view.delim_ddn,]),
-                                       HBox([view.header_ckb, view.skip_txt]),
-                                       view.scen_ignore_txt])])]
+        layout=Layout(width='50%'))
+    widgets = [view.skip_txt, view.delim_ddn, view.header_ddn, view.scen_ignore_txt]
+    set_width(widgets, width='110px', desc=True)
+    content = [section('a) Adjust upload parsing options', widgets)]
     
-    # Assign...
+    # Input preview
+    labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+    view.inp_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    content += [section('Upload data', [view.inp_grid])]
+
+    # Assign columns
     cols = [Label(value=col) for col in COLS]
     set_width(cols, '140px')
-    view.model_lbl = Label(value='TODO')
+    view.model_ddn = Dropdown()
     view.scen_col_ddn = Dropdown()
     view.reg_col_ddn = Dropdown()
     view.var_col_ddn = Dropdown()
@@ -105,20 +106,15 @@ def data_tab():
     view.unit_col_ddn = Dropdown()
     view.year_col_ddn = Dropdown()
     view.val_col_ddn = Dropdown()
-    widgets = [view.model_lbl, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
+    widgets = [view.model_ddn, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
                view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
     set_width(widgets, '140px')
-    content += [section('b) Assign columns from input data to output data', [VBox([HBox(cols), HBox(widgets)])])]
+    content += [section('b) Assign model and upload columns for submission', [VBox([HBox(cols), HBox(widgets)])])]
     
-    # Input preview
-    labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
-    view.inp_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
-    content += [section('c) Review input preview', [view.inp_grid])]
-
     # Output preview
     labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
     view.out_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
-    content += [section('d) Review output preview', [view.out_grid])]
+    content += [section('Sumission preview', [view.out_grid])]
 
     return VBox(content)
 

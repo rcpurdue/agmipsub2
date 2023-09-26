@@ -7,36 +7,34 @@ import sys
 import pandas as pd
 from nb.log import logger
 
-DATA_DIR = 'data'
-DATA_FILE = 'loti.csv'
-DOWNLOAD_DATA_NAME = 'loti-download'
-FLOAT_FORMAT = '0,.4f'
-
 model = sys.modules[__name__]
-
-# The models's "public" attributes are listed here, with type hints, for quick reference
-data: pd.DataFrame
-results: pd.DataFrame
-res_count: int = 0
-headers: list
-ymin: int
-ymax: int
-
 pd.set_option('display.width', 1000)  # Prevent data desc line breaking
 
+class FileError(Exception):
+    pass
 
 def start():
-    """Read data and/or prepare to query data."""
+    """Prep model."""
+    model.df = None  # Pandas DataFrame
 
-    # Load data into memory from file
-    model.data = pd.read_csv(os.path.join(DATA_DIR, DATA_FILE), escapechar='#')
-    model.headers = list(data.columns.values)
+def read_file(file_path):
+    """React to new file upload."""
 
-    # Get values for data selection  TODO ennforce data selection limits
-    model.ymin = min(data[data.columns[0]])
-    model.ymax = max(data[data.columns[0]])
+    # Check for upload error
+    if os.path.getsize(file_path) == 0:
+        raise FileError("Upload failed (size=0)")
+        
+    # Detect delimiter, header
+    try:
+        with open(file_path, newline='') as f:
+            sample = f.read(1024)
+            model.delim = csv.Sniffer().sniff(sample).delimiter
+            model.has_header = csv.Sniffer().has_header(sample)
+    except:
+        model.delim = None
+        model.has_header = None
 
-    logger.info('Data load completed')
+    logger.debug(f'Delimiter/header: "{model.delim}"/{model.has_header}')
 
 
 def set_disp(data=None, limit=None, wide=False):
@@ -47,36 +45,6 @@ def set_disp(data=None, limit=None, wide=False):
     pd.set_option('display.max_rows', limit + 1)
 
     if wide:
-        pd.set_option('display.float_format', lambda x: format(x, FLOAT_FORMAT))
+        pd.set_option('display.float_format', lambda x: format(x, '0,.4f'))
 
 
-def clear_selection_results():
-    """Reset results-tracking attributes."""
-    model.results = None
-    model.res_count = 0
-
-
-def select_data(from_year, to_year):
-    '''Use provided values to find data.'''
-    model.results = data[(data[headers[0]] >= int(from_year)) & (data[headers[0]] <= int(to_year))]
-    model.res_count = results.shape[0]
-    logger.debug('Results: '+str(res_count))
-
-
-def iterate_data():
-    """Get iterator for data."""
-    return model.data.itertuples()
-
-
-def create_download_file(data, file_format_ext):
-    """Prep data for export."""
-
-    # First, to save space, delete existing download file(s)
-    for filename in glob.glob(DOWNLOAD_DATA_NAME + '.*'):
-        os.remove(filename)
-
-    # Create new download file TODO Other download formats
-    filename = DOWNLOAD_DATA_NAME + '.' + file_format_ext
-    data.to_csv(filename, index=False, quoting=csv.QUOTE_NONNUMERIC)
-
-    return filename
