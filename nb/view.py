@@ -3,8 +3,8 @@
 import sys
 from IPython.display import display, clear_output
 from ipywidgets import \
-    Accordion, Checkbox,  Dropdown, FileUpload, GridBox, HBox, IntText, Label, \
-    Layout, Output, HTML, Image, ToggleButtons, Select, Tab, Text, Textarea, VBox 
+    Accordion,  Dropdown, GridBox, HBox, IntText, Label, \
+    Layout, Output, HTML, Image, ToggleButtons, Select, Tab, Text, VBox 
 import ipyuploads
 from nb import controller as ctrl
 from nb.log import logger, log_handler
@@ -68,7 +68,7 @@ def set_width(widgets, width='auto', desc=False):
 def upload_tab():
     '''Create widgets for upload tab content.'''
     content = []
-    view.uploader = ipyuploads.Upload(accept='*', multiple=False, all_files_complete=ctrl.when_upload_copleted)
+    view.uploader = ipyuploads.Upload(accept='*', multiple=False, all_files_complete=ctrl.when_upload_completed)
     view.file_info = Label(layout=Layout(margin='0 0 0 50px'))
     content.append(section('a) Select file for upload', [HBox([view.uploader, view.file_info])]))
     view.project = Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
@@ -80,48 +80,47 @@ def data_tab():
 
     # Upload parsing options
     view.skip_txt = IntText(description='Num. lines to skip')
-    view.delim_ddn = Dropdown(description='Delimiter')
-    view.header_ddn = Dropdown(description='Had header row', options=[('Yes', True), ('No', False)])
+    view.delim_ddn = Dropdown(description='Delimiter', options=[('Comma (,)',','), ('Tab (\t)','\t'), ('Semicolon (;)',';'),
+                                                                ('Pipe (|)','|'), ('Space ( )',' '), ("Single Quote (')","'"), 
+                                                                ('Double Quote (")','"'), ('Tilde (~)','~'), ('Colon (:)',':')])
+    view.header_ddn = Dropdown(description='Has header row?', options=[('Yes', True), ('No', False)])
     view.scen_ignore_txt = Text(
         description='Ignore scenarios',
         placeholder="(Optional) Enter comma-separated scenario values",
         layout=Layout(width='50%'))
     widgets = [view.skip_txt, view.delim_ddn, view.header_ddn, view.scen_ignore_txt]
     set_width(widgets, width='110px', desc=True)
-    content = [section('a) Adjust upload parsing options', widgets)]
-    
-    # Input preview
-    labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+        
+    # Input preview "grid"
+    labels = [Label(layout=Layout(border='1px solid lightgray', padding='0px', margin='0px')) for _ in range(24)]
     view.inp_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
-    content += [section('Upload data', [view.inp_grid])]
+
+    content = [section('a) Adjust upload parsing options', widgets + [Label('Sample of parsed data:'), view.inp_grid])]
 
     # Assign columns
     cols = [Label(value=col) for col in COLS]
     set_width(cols, '140px')
-    view.model_ddn = Dropdown()
-    view.scen_col_ddn = Dropdown()
-    view.reg_col_ddn = Dropdown()
-    view.var_col_ddn = Dropdown()
-    view.item_col_ddn = Dropdown()
-    view.unit_col_ddn = Dropdown()
-    view.year_col_ddn = Dropdown()
-    view.val_col_ddn = Dropdown()
+    view.model_ddn, view.scen_col_ddn = Dropdown(), Dropdown()
+    view.reg_col_ddn, view.var_col_ddn = Dropdown(), Dropdown()
+    view.item_col_ddn, view.unit_col_ddn = Dropdown(), Dropdown()
+    view.year_col_ddn, view.val_col_ddn = Dropdown(), Dropdown()
     widgets = [view.model_ddn, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
                view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
     set_width(widgets, '140px')
-    content += [section('b) Assign model and upload columns for submission', [VBox([HBox(cols), HBox(widgets)])])]
     
-    # Output preview
-    labels = [Label(value='TODO', layout=Layout(border='1px solid', padding='0px', margin='0px')) for _ in range(24)]
+    # Output preview "grid"
+    labels = [Label(layout=Layout(border='1px solid lightgray', padding='0px', margin='0px')) for _ in range(3*8)]
     view.out_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
-    content += [section('Sumission preview', [view.out_grid])]
+
+    content += [section('b) Assign model and columns for submission', 
+                        [VBox([HBox(cols), HBox(widgets), Label('Submission preview:'), view.out_grid])])]
 
     return VBox(content)
 
 def integrity_tab():
     "Create widgets for integrity tab content."
 
-    # Rows overview
+    # Analysis
     view.struct_probs_int = Text(description='Structural problems (e.g. missing fields)', disabled=True)
     view.ignored_scens_int = Text(description='Ignored scenarios', disabled=True)
     view.dupes_int = Text(description='Duplicate records', disabled=True)

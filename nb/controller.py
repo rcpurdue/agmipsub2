@@ -26,12 +26,40 @@ def start(debug=False):
         logger.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
         raise
 
-def when_upload_copleted(names=None):
+def when_upload_completed(names=None):
     """React to user uploading file."""
-    try:
-        logger.debug(f'Upload: {names}')
+    logger.debug(f'Upload: {names}')
+
+    if model.set_file(names[0]["name"]):
         view.file_info.value = f'Uploaded "{names[0]["name"]}", {names[0]["size"]} bytes'    
-        model.read_file(names[0]["name"])
-    except Exception as e:
-        logger.debug('Exception during upload...\n'+traceback.format_exc())
-        view.file_info.value = f'ERROR: "{traceback.format_exception_only(type(e), e)[-1].split(":")[1]}"'    
+        
+        if model.detect_delim():
+            view.delim_ddn.value = model.delim
+            
+            if model.read_file():
+                refresh_upload_sample()
+    else:
+        view.file_info.value = f'(UPLOAD ERROR)'    
+
+def refresh_upload_sample():
+    """Populate upload sample widget w/ data."""
+    data_rows = 3
+
+    if model.has_header():
+        data_rows = 2
+
+        for i, header in enumerate(model.df.columns):
+            view.inp_grid.children[i].value = header
+
+            if i == 7:
+                break
+
+    for r, row in model.df.head(data_rows).iterrows():
+        
+        for c, value in enumerate(row):
+            view.inp_grid.children[(r+(3-data_rows))*8+c].value = str(value)        
+
+            if c == 7:
+                break
+    
+
