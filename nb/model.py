@@ -17,7 +17,7 @@ class FileError(Exception):
 def start():
     """Prep model."""
     model.df = None  # Pandas DataFrame
-    model.delim = None
+    model.detected_delim = None
     model.path = None
 
 def set_file(file_path):
@@ -34,21 +34,31 @@ def detect_delim():
     try:
         with open(model.path, newline='') as f:
             sample = f.read(1024)
-            model.delim = csv.Sniffer().sniff(sample).delimiter
+            model.detected_delim = csv.Sniffer().sniff(sample).delimiter
     except:
         logger.debug('Exception: detect_delim()...\n'+traceback.format_exc())
-        model.delim = None
+        model.detected_delim = None
 
-    logger.debug(f'Delimiter: "{model.delim}"')
-    return model.delim is not None
+    logger.debug(f'Delimiter: "{model.detected_delim}"')
+    return model.detected_delim is not None
 
-def read_file():
+def read_file(delim=None, skip=0, header='infer', ignore=[]):
+
+    if not header == 'infer':
+        header = skip + 0 if header else None
+
     try:
-        model.df = pd.read_csv(model.path, sep=model.delim, dtype=str)
+        model.df = pd.read_csv(model.path, sep=delim, dtype=str, skiprows=skip, header=header)
         logger.debug(f'Records: "{len(model.df)}"')
     except:
         model.df, model.delim = None, None
         logger.debug('Exception: read_file()...\n'+traceback.format_exc())
+
+    if len(ignore) > 0:
+        contains_values = model.df.isin(ignore)
+        columns_with_values = contains_values.any(axis=0)
+        columns_list = columns_with_values[columns_with_values].index.tolist()
+        logger.debug(f'column list for ignore of {ignore}: {columns_list}')
 
     return model.df is not None
 
