@@ -52,35 +52,27 @@ def reload(_):
         refresh_upload_sample()
 
 def refresh_upload_sample():
-    """Populate upload sample widget w/ data."""
-    num_data_rows = 3
+    """Populate upload sample widget w/data."""
 
-    # Empty data
-    if model.df is None:
+    # Clear sample view widgets
+    for i in range(3*8):
+        view.inp_grid.children[i].value = ''        
 
-        for i in range(3*8):
-            view.inp_grid.children[i].value = ' ?'        
+    if model.df is not None:
+        num_data_rows = 3  # Assume no header
 
-    else:   
-        # Header row
+        # Possible header row
         if model.has_header():
             num_data_rows = 2
 
-            for i, header in enumerate(model.df.columns):
+            for i, header in enumerate(model.df.columns[:8]):
                 view.inp_grid.children[i].value = header
                 view.inp_grid.children[i].style.font_weight = 'bold'                
-
-                if i == 7:
-                    break
         
         # Data rows
         for r, row in model.df.head(num_data_rows).iterrows():
             
-            for c, value in enumerate(row):
+            for c, value in enumerate(row[:8]):
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].value = str(value)        
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].style.font_weight = 'normal'
-
-                if c == 7:
-                    break
     
-

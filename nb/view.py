@@ -3,7 +3,7 @@
 import sys
 from IPython.display import display, clear_output
 from ipywidgets import \
-    Accordion,  Dropdown, GridBox, HBox, IntText, Label, \
+    Accordion,  Dropdown, GridBox, HBox, BoundedIntText, Label, \
     Layout, Output, HTML, Image, ToggleButtons, Select, Tab, Text, VBox 
 import ipyuploads
 from nb import controller as ctrl
@@ -79,7 +79,7 @@ def data_tab():
     '''Create widgets for data tab content.'''
 
     # Upload parsing options
-    view.skip_txt = IntText(description='Num. lines to skip')
+    view.skip_txt = BoundedIntText(description='Num. lines to skip', min=0)
     view.delim_ddn = Dropdown(description='Delimiter', options=[('Comma (,)',','), ('Tab (\t)','\t'), ('Semicolon (;)',';'),
                                                                 ('Pipe (|)','|'), ('Space ( )',' '), ("Single Quote (')","'"), 
                                                                 ('Double Quote (")','"'), ('Tilde (~)','~'), ('Colon (:)',':')])
