@@ -1,10 +1,12 @@
 # controller.py - Central logic for app
 # rcampbel@purdue.edu - 2020-07-14
 import logging
+import os
 import sys
 import traceback
 from nb import model
 from nb import view
+from nb.config import cfg
 from nb.log import logger, log_handler
 
 ctrl = sys.modules[__name__]
@@ -16,15 +18,32 @@ def start(debug=False):
         log_handler.setLevel(logging.DEBUG)
         logger.setLevel(logging.DEBUG)
 
+    # Find user's projects
+
+    ctrl.user_projects = []
+
+    for user_group in os.popen('groups').read().strip('\n').split(' '):
+        
+        for project in cfg.all_projects:
+        
+            if user_group ==  project.group:
+                ctrl.user_projects.append(project)
+
     model.start()  
     view.start(debug)  
 
     # Setup callbacks NOTE uploader's callback set by view
     try:
+        # Upload
+        view.project.observe(ctrl.project, 'value')
+        # Submission
         view.skip_txt.observe(ctrl.reload, 'value')
         view.delim_ddn.observe(ctrl.reload, 'value')
         view.header_ddn.observe(ctrl.reload, 'value')
         view.scen_ignore_txt.observe(ctrl.reload, 'value')
+        # Integrity
+        # Plausibility
+        # Activity
         logger.info('App running')
     except Exception:
         logger.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
@@ -75,4 +94,10 @@ def refresh_upload_sample():
             for c, value in enumerate(row[:8]):
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].value = str(value)        
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].style.font_weight = 'normal'
-    
+
+def project(_):
+    logger.debug(f'view.project.value: {view.project.value}')
+
+    if view.project.value is not None:
+        model.load_rules(view.project.value)
+        view.model_ddn.options = model.all_models()

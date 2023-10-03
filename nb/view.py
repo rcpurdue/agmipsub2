@@ -27,7 +27,7 @@ def start(show_log):
 
     # Tabs
 
-    tabs = Tab(children=[upload_tab(), data_tab(),
+    tabs = Tab(children=[upload_tab(), submission_tab(),
                          integrity_tab(), plausibility_tab(),
                          activity_tab()])
 
@@ -71,11 +71,11 @@ def upload_tab():
     view.uploader = ipyuploads.Upload(accept='*', multiple=False, all_files_complete=ctrl.when_upload_completed)
     view.file_info = Label(layout=Layout(margin='0 0 0 50px'))
     content.append(section('a) Select file for upload', [HBox([view.uploader, view.file_info])]))
-    view.project = Select(options=['Linux', 'Windows', 'macOS'], disabled=False)  # TODO poopulate projects./,mn
+    view.project = Select(options=[(prj.name, prj) for prj in ctrl.user_projects], value=None, disabled=False)  
     content.append(section('b) Select project', [view.project]))
     return VBox(content)
 
-def data_tab():
+def submission_tab():
     '''Create widgets for data tab content.'''
 
     # Upload parsing options
