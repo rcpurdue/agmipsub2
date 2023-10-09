@@ -97,16 +97,22 @@ def submission_tab():
 
     content = [section('a) Adjust upload parsing options', widgets + [Label('Sample of parsed data:'), view.inp_grid])]
 
+    # Assign model (incl. spacer)
+    view.model_ddn = Dropdown()
+    cols = [Label(value=COLS[0])]
+    widgets = [view.model_ddn]
+
     # Assign columns
-    cols = [Label(value=col) for col in COLS]
-    set_width(cols, '140px')
-    view.model_ddn, view.scen_col_ddn = Dropdown(), Dropdown()
-    view.reg_col_ddn, view.var_col_ddn = Dropdown(), Dropdown()
-    view.item_col_ddn, view.unit_col_ddn = Dropdown(), Dropdown()
-    view.year_col_ddn, view.val_col_ddn = Dropdown(), Dropdown()
-    widgets = [view.model_ddn, view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
+    view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn = Dropdown(), Dropdown(), Dropdown()
+    view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn = Dropdown(), Dropdown(), Dropdown(), Dropdown()
+    cols += [Label(value=col) for col in COLS[1:]]
+    widgets += [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
                view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
+    set_width(cols, '140px')
     set_width(widgets, '140px')
+
+    cols.insert(1, Label(layout=Layout(width='50px')))
+    widgets.insert(1, Label(layout=Layout(width='50px')))
     
     # Output preview "grid"
     labels = [Label(layout=Layout(border='1px solid lightgray', padding='0px', margin='0px')) for _ in range(3*8)]

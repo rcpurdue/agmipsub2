@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import traceback
+import difflib
 from nb import model
 from nb import view
 from nb.config import cfg
@@ -32,6 +33,8 @@ def start(debug=False):
 
     model.start()
     view.start(debug)
+    ctrl.col_map = [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,  
+                    view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn]
 
     # Setup callbacks NOTE uploader's callback set by view
     try:
@@ -42,6 +45,8 @@ def start(debug=False):
         view.delim_ddn.observe(ctrl.when_reload, 'value')
         view.header_ddn.observe(ctrl.when_reload, 'value')
         view.scen_ignore_txt.observe(ctrl.when_reload, 'value')
+        view.model_ddn.observe(ctrl.refresh_submission_preview, 'value')
+        ctrl.col_map_observe(activate=True)
         # Integrity
         # Plausibility
         # Activity
@@ -50,6 +55,14 @@ def start(debug=False):
         logger.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
         raise
 
+def col_map_observe(activate):
+    """Turn on/off callbacks for column mapping widgets."""
+    for widget in ctrl.col_map:
+        
+        if activate:
+            widget.observe(ctrl.refresh_submission_preview, 'value')
+        else:
+            widget.unobserve(ctrl.refresh_submission_preview, 'value')
 
 def when_upload_completed(names=None):
     """React to user uploading file."""
@@ -63,17 +76,18 @@ def when_upload_completed(names=None):
             view.delim_ddn.value = model.detected_delim
             model.read_file(delim=view.delim_ddn.value)
             refresh_upload_sample()
+            init_assign_columns()
     else:
         view.file_info.value = '(UPLOAD ERROR)'
 
 
-def when_reload(_):
+def when_reload(_=None):
     """Due to param change, ask model to relead data, relfect new data in view."""
     if model.path is not None:
         model.read_file(delim=view.delim_ddn.value, skip=view.skip_txt.value, header=view.header_ddn.value,
                         ignore=[x.strip() for x in view.scen_ignore_txt.value.split(',')])
         refresh_upload_sample()
-
+        init_assign_columns()
 
 def refresh_upload_sample():
     """Populate upload sample widget w/data."""
@@ -100,10 +114,69 @@ def refresh_upload_sample():
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].value = str(value)
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].style.font_weight = 'normal'
 
+def init_assign_columns():
 
-def when_project_selected(_):
+    if model.df is not None:
+        # Col mapping dropdowns
+        options = [(str(widget.value), i) for i,widget in enumerate(view.inp_grid.children[0:8])]
+        text = [tup[0] for tup in options]
+        
+        for i, ddn in enumerate(ctrl.col_map):
+            ddn.options = options 
+
+            # Guess selected value TODO Also guess model 
+
+            ctrl.col_map_observe(False)
+
+            if model.has_header():
+                # Hdr row: match col names 
+                match = difflib.get_close_matches(view.COLS[i+1], text, n=1, cutoff=0.9)  # i+1 to skip model 
+
+                if match is not None and len(match) > 0:
+                    logger.debug(f'match: {match}')
+                    ddn.index = text.index(match[0])
+                    logger.debug(f'ddn.index: {ddn.index}')
+            else:
+                # No hdr row: match value from rules
+                pass  # TODO match cols based on rule file
+
+            ctrl.col_map_observe(True)
+
+        refresh_submission_preview()
+
+def refresh_submission_preview(_=None):
+    """Populate submission preview widgets w/data."""
+
+    # Clear sample view widgets
+    for i in range(3*8):
+        
+        if i < 8:
+            view.out_grid.children[i].value = view.COLS[i]  
+            view.out_grid.children[i].style.font_weight = 'bold'
+        else:
+            view.out_grid.children[i].value = ' '  
+
+    if model.df is not None:
+
+        # Data rows
+        for r in range(1,3):  # Skip header
+            view.out_grid.children[r*8+0].value = str(view.model_ddn.value)
+
+            for c in range(0,7):  # Size of col map
+
+                mapped_col = ctrl.col_map[c].value    
+                logger.debug(f'mapped_col={mapped_col}')
+                view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
+
+
+def when_project_selected(_=None):
     logger.debug(f'view.project.value: {view.project.value}')
 
     if view.project.value is not None:
         model.load_rules(view.project.value)
+        ctrl.col_map_observe(False)
         view.model_ddn.options = model.all_models()
+        ctrl.col_map_observe(True)
+        view.model_ddn.value = view.model_ddn.options[0]
+        
+    
