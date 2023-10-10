@@ -27,18 +27,18 @@ def start(show_log):
 
     # Tabs
 
-    tabs = Tab(children=[upload_tab(), submission_tab(),
+    view.tabs = Tab(children=[upload_tab(), submission_tab(),
                          integrity_tab(), plausibility_tab(),
                          activity_tab()])
 
     for i, text in enumerate(['1. Upload file', '2. Create submission', '3. Check integrity', 
                                    '4. Check plausibility', 'View activity']):
-        tabs.set_title(i, text)
+        view.tabs.set_title(i, text)
 
     # Show app
     header = HBox([app_title, logo])
     header.layout.justify_content = 'space-between'
-    display(VBox([header, tabs]))
+    display(VBox([header, view.tabs]))
     logger.info('UI build completed')
 
     if show_log:
@@ -132,7 +132,7 @@ def integrity_tab():
     view.dupes_int = Text(description='Duplicate records', disabled=True)
     view.accepted_int = Text(description='Accepted records', disabled=True)
     widgets = [view.struct_probs_int, view.ignored_scens_int, view.dupes_int, view.accepted_int]
-    set_width(widgets, '360px')
+    set_width(widgets, '460px')
     set_width(widgets, '300px',  desc=True)
     content =[section('a) Review analysis', widgets, 'Classifications and row counts:')]
 

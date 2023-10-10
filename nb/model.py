@@ -16,11 +16,14 @@ class FileError(Exception):
 
 def start():
     """Prep model."""
-    model.df = None  # Pandas DataFrame
+    model.df = None  # Pandas DataFrame - all rows read from file
+    model.preview_df = None  # Pandas DataFrame - first few rows of model.df that don't have ignoreed scencarios 
     model.detected_delim = None
     model.path = None
     model.suspect_scen_col = None
     model.rules = None
+    model.num_rows_read = 0
+    model.num_rows_ignored_scens = 0
 
 def set_file(file_path):
     try:
@@ -56,33 +59,47 @@ def read_file(delim=None, skip=0, header='infer', ignore=[]):
         model.df, model.delim = None, None
         logger.debug('Exception: read_file()...\n'+traceback.format_exc())
 
-    if len(ignore) > 0:
-        # Try to find column holding scenario data
-        columns_with_values = model.df.isin(ignore).any(axis=0)
-        columns_list = columns_with_values[columns_with_values].index.tolist()
-        
-        if len(columns_list) == 1:
-            # Filter using suspected scen col & ignore list 
-            model.suspect_scen_col = columns_list[0]
-            logger.debug(f'Suspected sceanrio column: "{model.suspect_scen_col}"')
-            filtered_df = model.df[~model.df[model.suspect_scen_col].isin(ignore)]
-            model.df = filtered_df.reset_index(drop=True)
-
+    model.num_rows_read = len(model.df)
+    model.ignore_scenarios(ignore)
     return model.df is not None
+
+def ignore_scenarios(ignore, scenario_col=None, remove=False):
+    logger.debug(f'model.ignore(): ignore={scenario_col}, scenario_col={scenario_col}, remove={remove}')
+    
+    if len(ignore) > 0:
+
+        if scenario_col is None:
+            # Try to find column holding scenario data
+            columns_with_values = model.df.isin(ignore).any(axis=0)
+            columns_list = columns_with_values[columns_with_values].index.tolist()
+
+            if len(columns_list) == 1:
+                scenario_col = columns_list[0]
+                logger.debug(f'model.ignore(): suspect scenario col={scenario_col}')
+
+        if scenario_col is not None:
+            # Filter using scen col & ignore list 
+            filtered_df = model.df[~model.df[scenario_col].isin(ignore)]
+
+            # Save count for integrity tab
+            logger.debug(f'model.ignore(): num_rows_ignored_scens={model.num_rows_ignored_scens}')
+            model.num_rows_ignored_scens = len(model.df) - len(filtered_df)
+
+            if remove:
+                model.df = filtered_df.reset_index(drop=True)
+                model.preview_df = model.df.head(3)
+            else:
+                model.preview_df = filtered_df.copy().reset_index(drop=True).head(3) 
+    
+    else:
+        model.num_rows_ignored_scens = 0  # Save count for integrity tab
+        model.preview_df = model.df.head(3) 
+
+
+
 
 def has_header():
     return isinstance(model.df.columns[0], str)
-
-# TODO Remove?
-def set_disp(data=None, limit=None, wide=False):
-    """Prep Pandas to display specific number of data lines."""
-    if not limit:
-        limit = data.shape[0]
-
-    pd.set_option('display.max_rows', limit + 1)
-
-    if wide:
-        pd.set_option('display.float_format', lambda x: format(x, '0,.4f'))
 
 def load_rules(project):
     """Read all rules from worksheets in project's xlsx file."""
@@ -91,3 +108,7 @@ def load_rules(project):
 
 def all_models():
     return list(model.rules['ModelTable']['Model']) 
+
+def analyze():
+    model.num_rows_with_nan = model.df.isna().any(axis=1).sum()
+    model.duplicate_rows = model.df.duplicated().sum()

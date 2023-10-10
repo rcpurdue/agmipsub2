@@ -38,6 +38,7 @@ def start(debug=False):
 
     # Setup callbacks NOTE uploader's callback set by view
     try:
+        view.tabs.observe(when_tab_changes, 'selected_index' , 'change')
         # Upload
         view.project.observe(ctrl.when_project_selected, 'value')
         # Submission
@@ -55,15 +56,26 @@ def start(debug=False):
         logger.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
         raise
 
-def col_map_observe(activate):
-    """Turn on/off callbacks for column mapping widgets."""
-    for widget in ctrl.col_map:
-        
-        if activate:
-            widget.observe(ctrl.refresh_submission_preview, 'value')
-        else:
-            widget.unobserve(ctrl.refresh_submission_preview, 'value')
+def when_tab_changes(change):
+    """React to user selecting tab."""
+    logger.debug(f"when_tab_changes: new={change['new']} old={change['old']}")
 
+    if change['new'] + 1 == 1:  # Upload
+        pass
+    elif change['new'] + 1 == 2:  # Submission
+        refresh_upload_sample()
+        init_assign_columns()
+    elif change['new'] + 1 == 3:  # Integrity
+        model.analyze()
+        view.struct_probs_int.value = str(model.num_rows_with_nan )
+        view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
+        view.dupes_int.value = str(model.duplicate_rows)
+        view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - model.num_rows_ignored_scens - model.duplicate_rows )
+    elif change['new'] + 1 == 4:  # Plausibility
+        pass
+    else:  # Activity
+        pass
+    
 def when_upload_completed(names=None):
     """React to user uploading file."""
     # NOTE Callback to this method registered in view
@@ -75,11 +87,21 @@ def when_upload_completed(names=None):
         if model.detect_delim():
             view.delim_ddn.value = model.detected_delim
             model.read_file(delim=view.delim_ddn.value)
-            refresh_upload_sample()
-            init_assign_columns()
     else:
         view.file_info.value = '(UPLOAD ERROR)'
 
+def when_project_selected(_=None):
+    logger.debug(f'view.project.value: {view.project.value}')
+
+    if view.project.value is not None:
+        model.load_rules(view.project.value)  # Read rules file
+
+        # Set model dropdown menu
+        ctrl.col_map_observe(False)
+        view.model_ddn.options = model.all_models()
+        logger.debug(f'model_ddn.options: {view.model_ddn.options}')
+        view.model_ddn.value = view.model_ddn.options[0]
+        ctrl.col_map_observe(True)
 
 def when_reload(_=None):
     """Due to param change, ask model to relead data, relfect new data in view."""
@@ -90,29 +112,38 @@ def when_reload(_=None):
         init_assign_columns()
 
 def refresh_upload_sample():
-    """Populate upload sample widget w/data."""
+    """Populate upload sample widget w/data from preview data."""
 
     # Clear sample view widgets
     for i in range(3*8):
         view.inp_grid.children[i].value = ''
 
-    if model.df is not None:
+    if model.preview_df is not None:
         num_data_rows = 3  # Assume no header
 
         # Possible header row
         if model.has_header():
             num_data_rows = 2
 
-            for i, header in enumerate(model.df.columns[:8]):
+            for i, header in enumerate(model.preview_df.columns[:8]):
                 view.inp_grid.children[i].value = header
                 view.inp_grid.children[i].style.font_weight = 'bold'
 
         # Data rows
-        for r, row in model.df.head(num_data_rows).iterrows():
+        for r, row in model.preview_df.head(num_data_rows).iterrows():
 
             for c, value in enumerate(row[:8]):
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].value = str(value)
                 view.inp_grid.children[(r+(3-num_data_rows))*8+c].style.font_weight = 'normal'
+
+def col_map_observe(activate):
+    """Turn on/off callbacks for column mapping widgets."""
+    for widget in ctrl.col_map:
+        
+        if activate:
+            widget.observe(ctrl.refresh_submission_preview, 'value')
+        else:
+            widget.unobserve(ctrl.refresh_submission_preview, 'value')
 
 def init_assign_columns():
 
@@ -165,18 +196,9 @@ def refresh_submission_preview(_=None):
             for c in range(0,7):  # Size of col map
 
                 mapped_col = ctrl.col_map[c].value    
-                logger.debug(f'mapped_col={mapped_col}')
-                view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
-
-
-def when_project_selected(_=None):
-    logger.debug(f'view.project.value: {view.project.value}')
-
-    if view.project.value is not None:
-        model.load_rules(view.project.value)
-        ctrl.col_map_observe(False)
-        view.model_ddn.options = model.all_models()
-        ctrl.col_map_observe(True)
-        view.model_ddn.value = view.model_ddn.options[0]
+                
+                if mapped_col is not None and len(model.df.iloc[r].values) > mapped_col:
+                    logger.debug(f'mapped_col={mapped_col}')
+                    view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
         
     
