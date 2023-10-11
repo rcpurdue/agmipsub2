@@ -66,11 +66,14 @@ def when_tab_changes(change):
         refresh_upload_sample()
         init_assign_columns()
     elif change['new'] + 1 == 3:  # Integrity
-        model.analyze()
+        model.analyze({i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)})  # +1 to skip model
+
+        # Row counts
         view.struct_probs_int.value = str(model.num_rows_with_nan )
         view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
         view.dupes_int.value = str(model.duplicate_rows)
         view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - model.num_rows_ignored_scens - model.duplicate_rows )
+
     elif change['new'] + 1 == 4:  # Plausibility
         pass
     else:  # Activity
