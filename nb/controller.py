@@ -11,7 +11,8 @@ from nb.config import cfg
 from nb.log import logger, log_handler
 
 ctrl = sys.modules[__name__]
-
+DEL = '-DELETE-RECORDS-'
+OVR = '-OVERRIDE-'
 
 def start(debug=False):
     """Begin running the app."""
@@ -67,13 +68,7 @@ def when_tab_changes(change):
         init_assign_columns()
     elif change['new'] + 1 == 3:  # Integrity
         model.analyze({i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)})  # +1 to skip model
-
-        # Row counts
-        view.struct_probs_int.value = str(model.num_rows_with_nan )
-        view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
-        view.dupes_int.value = str(model.duplicate_rows)
-        view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - model.num_rows_ignored_scens - model.duplicate_rows )
-
+        refresh_integrity()
     elif change['new'] + 1 == 4:  # Plausibility
         pass
     else:  # Activity
@@ -204,4 +199,30 @@ def refresh_submission_preview(_=None):
                     logger.debug(f'mapped_col={mapped_col}')
                     view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
         
-    
+def refresh_integrity():
+    "Display analysis results."
+
+    # Row counts
+    view.struct_probs_int.value = str(model.num_rows_with_nan )
+    view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
+    view.dupes_int.value = str(model.duplicate_rows)
+    view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - model.num_rows_ignored_scens - model.duplicate_rows )
+
+    # Bad labels
+
+    bad_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (applied automatically)')] 
+
+    for col, lbl, fix in model.bad_labels:
+        bad_grid_widgets += [view.cell(col), view.cell(lbl), view.cell(fix)]
+
+    view.bad_grid.children = bad_grid_widgets
+
+    # Unknown labels
+
+    unknown_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (select from menu)')]
+
+    for col, lbl, match in model.unknown_labels:
+        ddn = view.cell_ddn(ctrl.DEL if match is None else match, [ctrl.DEL, ctrl.OVR] + model.get_valid(col))
+        unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
+
+    view.unknown_grid.children = unknown_grid_widgets 

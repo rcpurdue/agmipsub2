@@ -5,6 +5,7 @@ import csv
 import glob
 import sys
 import traceback
+import difflib
 import pandas as pd
 from nb.log import logger
 
@@ -14,10 +15,7 @@ pd.set_option('display.width', 1000)  # Prevent data desc line breaking
 # Output col order:
 #    0)Model, 1)Scenario, 2)Region, 3)Variable, 4)Item, 5)Unit, 6)Year, 7)Value
 OUT_COL_NAMES = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year']
-
-
-class FileError(Exception):
-    pass
+FIX_TBL_SUFFIX = 'FixTable'
 
 def start():
     """Prep model."""
@@ -60,7 +58,7 @@ def read_file(delim=None, skip=0, header='infer', ignore=[]):
         header = skip + 0 if header else None
 
     try:
-        model.df = pd.read_csv(model.path, sep=delim, dtype=str, skiprows=skip, header=header)
+        model.df = pd.read_csv(model.path, sep=delim, dtype=str, skiprows=skip, header=header, keep_default_na=False)
         logger.debug(f'Records: "{len(model.df)}"')
     except:
         model.df, model.delim = None, None
@@ -105,36 +103,54 @@ def has_header():
 
 def load_rules(project):
     """Read all rules from worksheets in project's xlsx file."""
-    model.rules = pd.read_excel(os.path.join(project.base, project.rule_file), sheet_name=None, dtype=str)
+    model.rules = pd.read_excel(os.path.join(project.base, project.rule_file), sheet_name=None, dtype=str, keep_default_na=False)
     logger.debug(f'Rule keys: "{list(model.rules.keys())}"')
 
 def all_models():
     return list(model.rules['ModelTable']['Model']) 
 
 def analyze(col_map):
+    "Create row counts, bad label list, unknown label list."
     logger.debug(f'analyze(): col_map={col_map}') 
-    model.num_rows_with_nan = model.df.isna().any(axis=1).sum()  # Structural problems
-    model.duplicate_rows = model.df.duplicated().sum()  # Duplicate rows
-    model.bad_labels = {}
-    model.unknown_labels = []
+    model.num_rows_with_nan = model.df.isna().any(axis=1).sum()  # Row count: Structural problems
+    model.duplicate_rows = model.df.duplicated().sum()  # Row count: Duplicate rows
+    model.bad_labels, model.unknown_labels = [], []
 
-    # Find invalid labels & suggest fixes
+    # Process output data by column
     for i, name in enumerate(model.OUT_COL_NAMES[1:7]):  # Each column
         data = model.df.iloc[:, col_map[i+1]].unique()  # Unique labels in data (+1 to skip model)
         valid = model.rules[name+'Table'][name]  # Valid labels in rules
 
-        for label in list(set(data) - set(valid)):  # Each invalid label
-            model.unknown_labels.append(label) # Assume no fix, remove later if fix found
-            fix = None
+        # Check each invalid label
+        for label in list(set(data) - set(valid)):  
+            loc, row, fix, match = None, None, None, None  
 
-            if name+'FixTable' in model.rules.keys():  # Look for fix 
-                fix1 = model.rules[name+'FixTable'].loc[model.rules[name+'FixTable'][name] == label]
-                fix2 = fix1['Fix']
-                fix = list(fix2)
-                logger.debug(f'analyze(): name={name}, label={label}, fix1={fix1}, fix2={fix2}, fix={fix}')
+            # Is there a fix from a "fix' table in rules?
+            if name+FIX_TBL_SUFFIX in model.rules.keys():   
+                try:
+                    loc = model.rules[name+FIX_TBL_SUFFIX][name].str.lower() == label.lower()
+                    row = model.rules[name+FIX_TBL_SUFFIX][loc]
+                    fix = list(row['Fix'])
+                except Exception:
+                    logger.debug('Exception analyze() fix...\n'+traceback.format_exc())
 
-            if (fix is not None) and (len(fix) == 1): 
-                model.unknown_labels.remove(label)
-                model.bad_labels[label] = fix  # Fix found: add to "bad"s
+                logger.debug(f'analyze(): name="{name}", label="{label}", loc="{loc}", row="{row}", fix="{fix}"')
+
+            # Fix found: add to "bads"
+            if (fix is not None) and (len(fix) > 0): 
+                model.bad_labels.append((name, label, fix[0]))  
+            
+            # No fix found: add to "unkowns"
+            else:
+                try:
+                    logger.debug(f'analyze(): name="{name}", label="{label}", valid="{valid.tolist()}"')
+                    match = difflib.get_close_matches(str(label), valid.tolist(), n=1)[0]  # default cutoff=0.6 TODO Validate   
+                except Exception:
+                    logger.debug('Exception analyze() closest...\n'+traceback.format_exc())
+
+                model.unknown_labels.append((name, label, match))   
 
     logger.debug(f'analyze(): stuct_probs={model.num_rows_with_nan}, dupe={model.duplicate_rows}, bad={model.bad_labels}, unkwn={model.unknown_labels}')
+
+def get_valid(col):
+    return model.rules[col+'Table'][col].tolist()

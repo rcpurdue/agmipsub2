@@ -137,14 +137,13 @@ def integrity_tab():
     content =[section('a) Review analysis', widgets, 'Classifications and row counts:')]
 
     # Bad labels
-    view.bad_lbls_out = Output()
-    content += [section('b) Review bad labels', [view.bad_lbls_out], 'Non-standard labels that will be fixed automatically: ')]
+    view.bad_grid = GridBox(children=[], layout=Layout(grid_template_columns='repeat(3, 200px)', grid_gap='0px'))
+    content += [section('b) Review bad labels', [view.bad_grid], 'Non-standard labels with known repalcement values: ')]
     
     # Unknonw labels
-    view.unknown_lbls_out = Output()    
-    content += [section('c) Address unknow labels', [view.unknown_lbls_out],
-                        'NOTE: Records with labels left as-is will be DELETED. \
-                         (Fixed labels will be updated. Overriden labels place submission in "pending" status.)')]    
+    view.unknown_grid = GridBox(children=[], layout=Layout(grid_template_columns='repeat(3, 200px)', grid_gap='0px'))  
+    content += [section('c) Address unknown labels', [view.unknown_grid],
+                        f'NOTE: Selecting "{ctrl.OVR}" causes submission to be reviewed before acceptance.)')]    
     
     return VBox(content)
 
@@ -166,3 +165,12 @@ def activity_tab():
     "Create widgets for activity tab content."
     view.activity_out = Output()
     return(section('Review Submissions', [view.activity_out]))
+
+def cell(text):
+    return Label(value=text, layout=Layout(border='1px solid lightgray', padding='2px', margin='0px'))
+
+def cell_ddn(selected, choices):
+    return Dropdown(value=selected, options=choices, layout=Layout(border='1px solid lightgray', padding='2px', margin='0px'))
+
+def title(text):
+    return Label(value=text)
