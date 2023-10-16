@@ -10,8 +10,9 @@ from nb import controller as ctrl
 from nb.log import logger, log_handler
 
 COLS = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year', 'Value']
+PLOT_VALUE = 'Value trends'
+PLOT_GROWTH = 'Growth trends'
 view = sys.modules[__name__]
-
 
 def start(show_log):
     """Build the user interface."""
@@ -143,7 +144,8 @@ def integrity_tab():
     # Unknonw labels
     view.unknown_grid = GridBox(children=[], layout=Layout(grid_template_columns='repeat(3, 200px)', grid_gap='0px'))  
     content += [section('c) Address unknown labels', [view.unknown_grid],
-                        f'NOTE: Selecting "{ctrl.OVR}" causes submission to be reviewed before acceptance.)')]    
+                        f"""Non-standrads labels with no known replacement values:\n
+                            NOTE: Selecting "{ctrl.OVR}" causes submission to be reviewed before acceptance.)""")]    
     
     return VBox(content)
 
@@ -152,14 +154,12 @@ def plausibility_tab():
     view.plot_scen_ddn = Dropdown(description='Scenario')
     view.plot_reg_ddn = Dropdown(description='Region')
     view.plot_var_ddn = Dropdown(description='Variable')
-    widgets = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn]
+    view.plot_type_ddn = Dropdown(description='Plot', options=[view.PLOT_VALUE, view.PLOT_GROWTH])
+    widgets = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn, view.plot_type_ddn]
     set_width(widgets, '200px')
     set_width(widgets, '75px', desc=True)
-    view.plot_type_rb = ToggleButtons(options=['Value trends', 'Growth trends'],
-                                     layout=Layout(margin='0 0 0 100px'))
-    widgets.append(view.plot_type_rb)
-    view.plot_area = Output()
-    return(section('a) Review plots', [VBox([HBox(widgets), view.plot_area])], 'Visualize uploaded data to verify its plausibility.'))
+    view.plot_area = Output(layout=Layout(border='1px solid lightgray', padding='2px', margin='30px'))
+    return(section('a) Review plots', [VBox([HBox(widgets), view.plot_area])], 'Visualize processed data to verify plausibility.'))
 
 def activity_tab():
     "Create widgets for activity tab content."
@@ -174,3 +174,6 @@ def cell_ddn(selected, choices):
 
 def title(text):
     return Label(value=text)
+
+def output_msg(text):
+    display(Label(text))

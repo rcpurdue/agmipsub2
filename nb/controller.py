@@ -5,6 +5,8 @@ import os
 import sys
 import traceback
 import difflib
+import matplotlib.pyplot as plt
+from IPython.core.display import clear_output
 from nb import model
 from nb import view
 from nb.config import cfg
@@ -51,6 +53,7 @@ def start(debug=False):
         ctrl.col_map_observe(activate=True)
         # Integrity
         # Plausibility
+        ctrl.observe_plot_ddns()
         # Activity
         logger.info('App running')
     except Exception:
@@ -67,10 +70,13 @@ def when_tab_changes(change):
         refresh_upload_sample()
         init_assign_columns()
     elif change['new'] + 1 == 3:  # Integrity
-        model.analyze({i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)})  # +1 to skip model
+        ctrl.col_index_map = {i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)} 
+        model.analyze(ctrl.col_index_map)  # +1 to skip model
         refresh_integrity()
     elif change['new'] + 1 == 4:  # Plausibility
-        pass
+        apply_fixes()
+        refresh_plot_menus()        
+        plot()
     else:  # Activity
         pass
     
@@ -226,3 +232,69 @@ def refresh_integrity():
         unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
 
     view.unknown_grid.children = unknown_grid_widgets 
+
+def observe_plot_ddns(active=True):
+    if active:
+        view.plot_scen_ddn.observe(ctrl.plot, 'value')
+        view.plot_reg_ddn.observe(ctrl.plot, 'value')
+        view.plot_var_ddn.observe(ctrl.plot, 'value')
+        view.plot_type_ddn.observe(ctrl.plot, 'value')
+    else:
+        view.plot_scen_ddn.unobserve(ctrl.plot, 'value')
+        view.plot_reg_ddn.unobserve(ctrl.plot, 'value')
+        view.plot_var_ddn.unobserve(ctrl.plot, 'value')
+        view.plot_type_ddn.unobserve(ctrl.plot, 'value')
+
+def refresh_plot_menus():
+    view.plot_scen_ddn.options = model.get_unique(ctrl.col_index_map, 1)
+    view.plot_reg_ddn.options = model.get_unique(ctrl.col_index_map, 2)
+    view.plot_var_ddn.options = model.get_unique(ctrl.col_index_map, 3)
+    observe_plot_ddns(active=False)
+    view.plot_scen_ddn.index = 0
+    view.plot_reg_ddn.index = 0
+    view.plot_var_ddn.index = 0
+    observe_plot_ddns()
+
+def plot(_=None):
+    """Display plot."""
+    logger.debug(f'plot() scen={view.plot_scen_ddn.value}, reg={view.plot_reg_ddn.value}, var={view.plot_var_ddn.value}')
+
+    with view.plot_area:
+        clear_output(wait=True)
+        
+        try:
+            # Select data based on dropdowns
+            scn_col, reg_col, var_col = ctrl.col_index_map[1], ctrl.col_index_map[2], ctrl.col_index_map[3] 
+            mask = (model.df.iloc[:, scn_col] == view.plot_scen_ddn.value) & \
+                   (model.df.iloc[:, reg_col] == view.plot_reg_ddn.value) & \
+                   (model.df.iloc[:, var_col] == view.plot_var_ddn.value)
+            subset = model.df[mask].copy(deep=True)
+            
+            # Change year & value cols to numeric
+            yrs_col, val_col = ctrl.col_index_map[6], ctrl.col_index_map[7] 
+            subset.iloc[:, yrs_col] = subset.iloc[:, yrs_col].astype(int) 
+            subset.iloc[:, val_col] = subset.iloc[:, val_col].astype(float) 
+            logger.debug(f'plot() subset={subset}')
+            
+            # Display plot
+            subset.plot(kind='line', x=yrs_col, y=val_col)
+            plt.show()
+        except Exception as e:
+            logger.debug('Exception in plot()...\n'+traceback.format_exc())
+            view.output_msg(f'(Plot error: "{e}")')  # str(e).split(": ")[-1]
+
+def apply_fixes():
+    """Edit data based on bad/unknown labels and fixes from integrity check."""
+    widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
+    ctrl.pending = False
+
+    for i in range(len(widgets)//3):   
+        col, lbl, fix = widgets[i*3].value, widgets[i*3+1].value, widgets[i*3+2].value
+        logger.debug(f'apply_fixes(): col={col}, lbl={lbl}, fix={fix}, ')
+        
+        if fix == ctrl.OVR:
+            ctrl.pending = True
+        else:
+            model.fix(ctrl.col_index_map, col, lbl, fix, fix==ctrl.DEL)
+
+    logger.debug(f'apply_fixes() finish: model.df={model.df}')       

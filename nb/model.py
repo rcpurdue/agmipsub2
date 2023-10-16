@@ -13,9 +13,10 @@ model = sys.modules[__name__]
 pd.set_option('display.width', 1000)  # Prevent data desc line breaking
 
 # Output col order:
-#    0)Model, 1)Scenario, 2)Region, 3)Variable, 4)Item, 5)Unit, 6)Year, 7)Value
-OUT_COL_NAMES = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year']
+#                0)Model, 1)Scenario, 2)Region, 3)Variable, 4)Item, 5)Unit, 6)Year, 7)Value
+OUT_COL_NAMES = ['Model', 'Scenario', 'Region', 'Variable', 'Item', 'Unit', 'Year', 'Value']
 FIX_TBL_SUFFIX = 'FixTable'
+FIX_COL = 'Fix'
 
 def start():
     """Prep model."""
@@ -116,7 +117,7 @@ def analyze(col_map):
     model.duplicate_rows = model.df.duplicated().sum()  # Row count: Duplicate rows
     model.bad_labels, model.unknown_labels = [], []
 
-    # Process output data by column
+    # Process output data by column - except values col
     for i, name in enumerate(model.OUT_COL_NAMES[1:7]):  # Each column
         data = model.df.iloc[:, col_map[i+1]].unique()  # Unique labels in data (+1 to skip model)
         valid = model.rules[name+'Table'][name]  # Valid labels in rules
@@ -124,13 +125,14 @@ def analyze(col_map):
         # Check each invalid label
         for label in list(set(data) - set(valid)):  
             loc, row, fix, match = None, None, None, None  
+            logger.debug(f'analyze(): checking name={name}, label={label}')
 
             # Is there a fix from a "fix' table in rules?
             if name+FIX_TBL_SUFFIX in model.rules.keys():   
                 try:
                     loc = model.rules[name+FIX_TBL_SUFFIX][name].str.lower() == label.lower()
                     row = model.rules[name+FIX_TBL_SUFFIX][loc]
-                    fix = list(row['Fix'])
+                    fix = list(row[FIX_COL])
                 except Exception:
                     logger.debug('Exception analyze() fix...\n'+traceback.format_exc())
 
@@ -150,7 +152,33 @@ def analyze(col_map):
 
                 model.unknown_labels.append((name, label, match))   
 
+    # Find fixes for value col
+
+    na_mask = pd.to_numeric(model.df.iloc[:, col_map[7]], errors='coerce').isna()     
+    logger.debug(f'analyze(), values: na_mask="{na_mask}"')
+    non_num_unique = model.df.iloc[:, col_map[7]][na_mask].unique()
+    logger.debug(f'analyze(), values: non_num_unique="{non_num_unique}"')
+
+    for label in non_num_unique:
+        model.bad_labels.append((OUT_COL_NAMES[7], label, '0'))  # NOTE Hardcode zero TODO Verify      
+        logger.debug(f'analyze(), values: name="{OUT_COL_NAMES[7]}", label="{label}", fix="0"')
+
     logger.debug(f'analyze(): stuct_probs={model.num_rows_with_nan}, dupe={model.duplicate_rows}, bad={model.bad_labels}, unkwn={model.unknown_labels}')
 
-def get_valid(col):
+def get_valid(col): 
     return model.rules[col+'Table'][col].tolist()
+
+def get_unique(col_map, out_col_num):
+    return model.df.iloc[:, col_map[out_col_num]].unique().tolist()
+
+def fix(col_map, col, lbl, fix, remove_rows):
+    col = col_map[model.OUT_COL_NAMES.index(col)]  # Convert col hdr text to col index 
+    
+    if remove_rows:
+        model.df = model.df[model.df.iloc[:, col] != lbl]
+    else:
+        model.df.iloc[:, col] = model.df.iloc[:, col].replace(lbl, fix)
+
+    logger.debug(f'fix(): col="{col}", lbl="{lbl}", fix="{fix}", model.df="{model.df}"')
+
+
