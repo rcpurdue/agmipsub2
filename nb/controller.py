@@ -5,23 +5,19 @@ import os
 import sys
 import traceback
 import difflib
-import matplotlib.pyplot as plt
-from IPython.core.display import clear_output
 from nb import model
 from nb import view
-from nb.config import cfg
-from nb.log import logger, log_handler
+from nb.config import cfg, HDR, DEL, OVR
+from nb.log import log, log_handler
 
 ctrl = sys.modules[__name__]
-DEL = '-DELETE-RECORDS-'
-OVR = '-OVERRIDE-'
 
 def start(debug=False):
     """Begin running the app."""
 
     if debug:
         log_handler.setLevel(logging.DEBUG)
-        logger.setLevel(logging.DEBUG)
+        log.setLevel(logging.DEBUG)
 
     # Find user's projects
 
@@ -35,7 +31,7 @@ def start(debug=False):
                 ctrl.user_projects.append(project)
 
     model.start()
-    view.start(debug)
+    view.start(debug, when_upload_completed, ctrl.user_projects)
     ctrl.col_map = [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,  
                     view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn]
 
@@ -54,15 +50,15 @@ def start(debug=False):
         # Integrity
         # Plausibility
         ctrl.observe_plot_ddns()
-        # Activity
-        logger.info('App running')
+        # Submit
+        log.info('App running')
     except Exception:
-        logger.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
+        log.debug('Exception while setting up callbacks...\n'+traceback.format_exc())
         raise
 
 def when_tab_changes(change):
     """React to user selecting tab."""
-    logger.debug(f"when_tab_changes: new={change['new']} old={change['old']}")
+    log.debug(f"when_tab_changes: new={change['new']} old={change['old']}")
 
     if change['new'] + 1 == 1:  # Upload
         pass
@@ -77,13 +73,16 @@ def when_tab_changes(change):
         apply_fixes()
         refresh_plot_menus()        
         plot()
-    else:  # Activity
-        pass
-    
+    else:  # Submit
+        if ctrl.pending:
+            view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: PENDING REVIEW.' 
+        else:
+            view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: ACCEPTED.' 
+
 def when_upload_completed(names=None):
     """React to user uploading file."""
     # NOTE Callback to this method registered in view
-    logger.debug(f'Upload: {names}')
+    log.debug(f'Upload: {names}')
 
     if model.set_file(names[0]["name"]):
         view.file_info.value = f'Uploaded "{names[0]["name"]}", {names[0]["size"]} bytes'
@@ -95,7 +94,7 @@ def when_upload_completed(names=None):
         view.file_info.value = '(UPLOAD ERROR)'
 
 def when_project_selected(_=None):
-    logger.debug(f'view.project.value: {view.project.value}')
+    log.debug(f'view.project.value: {view.project.value}')
 
     if view.project.value is not None:
         model.load_rules(view.project.value)  # Read rules file
@@ -103,7 +102,7 @@ def when_project_selected(_=None):
         # Set model dropdown menu
         ctrl.col_map_observe(False)
         view.model_ddn.options = model.all_models()
-        logger.debug(f'model_ddn.options: {view.model_ddn.options}')
+        log.debug(f'model_ddn.options: {view.model_ddn.options}')
         view.model_ddn.value = view.model_ddn.options[0]
         ctrl.col_map_observe(True)
 
@@ -165,12 +164,12 @@ def init_assign_columns():
 
             if model.has_header():
                 # Hdr row: match col names 
-                match = difflib.get_close_matches(view.COLS[i+1], text, n=1, cutoff=0.9)  # i+1 to skip model 
+                match = difflib.get_close_matches(HDR[i+1], text, n=1, cutoff=0.9)  # i+1 to skip model 
 
                 if match is not None and len(match) > 0:
-                    logger.debug(f'match: {match}')
+                    log.debug(f'match: {match}')
                     ddn.index = text.index(match[0])
-                    logger.debug(f'ddn.index: {ddn.index}')
+                    log.debug(f'ddn.index: {ddn.index}')
             else:
                 # No hdr row: match value from rules
                 pass  # TODO match cols based on rule file
@@ -186,7 +185,7 @@ def refresh_submission_preview(_=None):
     for i in range(3*8):
         
         if i < 8:
-            view.out_grid.children[i].value = view.COLS[i]  
+            view.out_grid.children[i].value = HDR[i]  
             view.out_grid.children[i].style.font_weight = 'bold'
         else:
             view.out_grid.children[i].value = ' '  
@@ -202,7 +201,7 @@ def refresh_submission_preview(_=None):
                 mapped_col = ctrl.col_map[c].value    
                 
                 if mapped_col is not None and len(model.df.iloc[r].values) > mapped_col:
-                    logger.debug(f'mapped_col={mapped_col}')
+                    log.debug(f'mapped_col={mapped_col}')
                     view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
         
 def refresh_integrity():
@@ -228,7 +227,7 @@ def refresh_integrity():
     unknown_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (select from menu)')]
 
     for col, lbl, match in model.unknown_labels:
-        ddn = view.cell_ddn(ctrl.DEL if match is None else match, [ctrl.DEL, ctrl.OVR] + model.get_valid(col))
+        ddn = view.cell_ddn(DEL if match is None else match, [DEL, OVR] + model.get_valid(col))
         unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
 
     view.unknown_grid.children = unknown_grid_widgets 
@@ -238,12 +237,10 @@ def observe_plot_ddns(active=True):
         view.plot_scen_ddn.observe(ctrl.plot, 'value')
         view.plot_reg_ddn.observe(ctrl.plot, 'value')
         view.plot_var_ddn.observe(ctrl.plot, 'value')
-        view.plot_type_ddn.observe(ctrl.plot, 'value')
     else:
         view.plot_scen_ddn.unobserve(ctrl.plot, 'value')
         view.plot_reg_ddn.unobserve(ctrl.plot, 'value')
         view.plot_var_ddn.unobserve(ctrl.plot, 'value')
-        view.plot_type_ddn.unobserve(ctrl.plot, 'value')
 
 def refresh_plot_menus():
     view.plot_scen_ddn.options = model.get_unique(ctrl.col_index_map, 1)
@@ -257,31 +254,9 @@ def refresh_plot_menus():
 
 def plot(_=None):
     """Display plot."""
-    logger.debug(f'plot() scen={view.plot_scen_ddn.value}, reg={view.plot_reg_ddn.value}, var={view.plot_var_ddn.value}')
-
-    with view.plot_area:
-        clear_output(wait=True)
-        
-        try:
-            # Select data based on dropdowns
-            scn_col, reg_col, var_col = ctrl.col_index_map[1], ctrl.col_index_map[2], ctrl.col_index_map[3] 
-            mask = (model.df.iloc[:, scn_col] == view.plot_scen_ddn.value) & \
-                   (model.df.iloc[:, reg_col] == view.plot_reg_ddn.value) & \
-                   (model.df.iloc[:, var_col] == view.plot_var_ddn.value)
-            subset = model.df[mask].copy(deep=True)
-            
-            # Change year & value cols to numeric
-            yrs_col, val_col = ctrl.col_index_map[6], ctrl.col_index_map[7] 
-            subset.iloc[:, yrs_col] = subset.iloc[:, yrs_col].astype(int) 
-            subset.iloc[:, val_col] = subset.iloc[:, val_col].astype(float) 
-            logger.debug(f'plot() subset={subset}')
-            
-            # Display plot
-            subset.plot(kind='line', x=yrs_col, y=val_col)
-            plt.show()
-        except Exception as e:
-            logger.debug('Exception in plot()...\n'+traceback.format_exc())
-            view.output_msg(f'(Plot error: "{e}")')  # str(e).split(": ")[-1]
+    log.debug(f'plot() scen={view.plot_scen_ddn.value}, reg={view.plot_reg_ddn.value}, var={view.plot_var_ddn.value}')
+    plot_data = model.select(ctrl.col_index_map, view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
+    view.display_plot(plot_data)
 
 def apply_fixes():
     """Edit data based on bad/unknown labels and fixes from integrity check."""
@@ -290,11 +265,11 @@ def apply_fixes():
 
     for i in range(len(widgets)//3):   
         col, lbl, fix = widgets[i*3].value, widgets[i*3+1].value, widgets[i*3+2].value
-        logger.debug(f'apply_fixes(): col={col}, lbl={lbl}, fix={fix}, ')
+        log.debug(f'apply_fixes(): col={col}, lbl={lbl}, fix={fix}, ')
         
-        if fix == ctrl.OVR:
+        if fix == OVR:
             ctrl.pending = True
         else:
-            model.fix(ctrl.col_index_map, col, lbl, fix, fix==ctrl.DEL)
+            model.fix(ctrl.col_index_map, col, lbl, fix, fix==DEL)
 
-    logger.debug(f'apply_fixes() finish: model.df={model.df}')       
+    log.debug(f'apply_fixes() finish: model.df={model.df}')       

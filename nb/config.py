@@ -1,5 +1,22 @@
+# config.py - Configuration info for notebook
+# rcampbel@purdue.edu - 2022-01-05
+
 from dataclasses import dataclass
 
+MOD = 'Model'  
+SCN = 'Scenario'
+REG = 'Region'  
+VAR = 'Variable'
+ITM = 'Item'    
+UNI = 'Unit'    
+YRS = 'Year'    
+VAL = 'Value'   
+
+#       0    1    2    3    4    5    6    7    
+HDR = [MOD, SCN, REG, VAR, ITM, UNI, YRS, VAL]
+
+DEL = '-DELETE-RECORDS-'
+OVR = '-OVERRIDE-'
 
 @dataclass
 class Project:

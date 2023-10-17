@@ -1,4 +1,4 @@
-# log.py - Logging for notebook
+# log.py - Logging for app
 # rcampbel@purdue.edu - 2022-01-05
 
 import logging
@@ -27,8 +27,8 @@ class NotebookLoggingHandler(logging.Handler):
             print(self.format(message))
 
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 log_handler = NotebookLoggingHandler(logging.INFO)
-logger.addHandler(log_handler)
-logger.addFilter(AppendFileLineToLog())
-logger.setLevel(logging.INFO)
+log.addHandler(log_handler)
+log.addFilter(AppendFileLineToLog())
+log.setLevel(logging.INFO)
