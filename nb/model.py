@@ -3,7 +3,7 @@
 import os
 import csv
 import sys
-import difflib
+from fuzzywuzzy import fuzz, process
 import pandas as pd
 from nb.log import log
 from nb.config import HDR, ITM, YRS, VAL  
@@ -125,10 +125,10 @@ def analyze(col_map):
             
             # No fix found: add to "unkowns"
             else:
-                match_list = difflib.get_close_matches(str(label), valid.tolist(), n=1)  # default cutoff=0.6 TODO Validate   
+                match = process.extractOne(str(label), valid.tolist(), scorer=fuzz.token_sort_ratio)  # Closest match
                 
-                if match_list is not None and len(match_list) > 0:
-                    model.unknown_labels.append((name, label, match_list[0]))  
+                if match is not None and len(match) > 0:
+                    model.unknown_labels.append((name, label, match[0]))  # Extract match word from tuple   
                 else:
                     model.unknown_labels.append((name, label, None))  
 
