@@ -141,10 +141,10 @@ def analyze(col_map):
         model.bad_labels.append((VAL, label, '0'))  # NOTE Hardcode zero TODO Verify      
 
 def get_valid(col): 
-    return model.rules[col+'Table'][col].tolist()
+    return sorted(model.rules[col+'Table'][col].tolist())
 
 def get_unique(col_map, out_col_num):
-    return model.df.iloc[:, col_map[out_col_num]].unique().tolist()
+    return sorted(model.df.iloc[:, col_map[out_col_num]].unique().tolist())
 
 def fix(col_map, col, lbl, fix, remove_rows):
     col = col_map[HDR.index(col)]  # Convert col hdr text to col index 
