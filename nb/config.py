@@ -3,6 +3,12 @@
 
 from dataclasses import dataclass
 
+UPLOAD = 'Upload file'
+SUBMISSION = 'Create submission'
+INTEGRITY = 'Check integrity'
+PLAUSIBILITY = 'Check plausibility'
+FINISH = 'Finish up'
+
 MOD = 'Model'  
 SCN = 'Scenario'
 REG = 'Region'  

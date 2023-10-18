@@ -8,24 +8,25 @@ import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
 from nb.log import log, log_handler
-from nb.config import MOD, HDR, OVR
+from nb.config import MOD, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
 
 view = sys.modules[__name__]
 
 def start(show_log, when_upload_completed, user_projects):
     """Build the user interface."""
-    display(HTML(filename='nb/custom.html'))  # Send CSS code down to browser
-    
+    display(HTML(filename='nb/custom.html'))  # Send CSS code down to browser    
     app_title = HTML('AgMIP GlobalEcon Data Submission')
     app_title.add_class('app_title') 
 
     with open('nb/logo.png', "rb") as logo_file:
         logo = Image(value=logo_file.read(), format='png', layout={'max_height': '32px'})
 
+    # Create tabs - NOTE Maintain corresponding order of IDs & children! 
+    view.tab_ids = {UPLOAD:0, SUBMISSION:1, INTEGRITY:2, PLAUSIBILITY:3, FINISH:4}
     view.tabs = Tab(children=[upload_tab(when_upload_completed, user_projects), submission_tab(), 
                               integrity_tab(), plausibility_tab(), submit_tab()],
-                    titles=['1. Upload file', '2. Create submission', '3. Check integrity',
-                            '4. Check plausibility', '5. Finish up'])
+                    titles=[f'{view.tab_ids[title]+1}. {title}' for title in view.tab_ids])
+    
     header = HBox([app_title, logo])
     header.layout.justify_content = 'space-between'
     display(VBox([header, view.tabs]))  # Show app

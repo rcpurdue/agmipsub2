@@ -7,7 +7,7 @@ import traceback
 import difflib
 from nb import model
 from nb import view
-from nb.config import cfg, HDR, DEL, OVR
+from nb.config import cfg, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
 from nb.log import log, log_handler
 
 ctrl = sys.modules[__name__]
@@ -30,60 +30,105 @@ def start(debug=False):
                 if user_group == project.group:
                     ctrl.user_projects.append(project)
 
+        # Build UI & data access objects
         model.start()
         view.start(debug, when_upload_completed, ctrl.user_projects)
-        ctrl.col_map = [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,  
-                        view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn]
+        
+        # Keep lists of some UI widgets 
+        ctrl.col_map = [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn, view.item_col_ddn,
+                        view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn]
+        ctrl.plot_ddns = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn]
 
         # Setup callbacks NOTE uploader's callback set by view
-
-        view.tabs.observe(when_tab_changes, 'selected_index' , 'change')
-        
-        # Upload
-        view.project.observe(ctrl.when_project_selected, 'value')
-        
-        # Submission
-        view.skip_txt.observe(ctrl.when_reload, 'value')
+        view.tabs.observe(when_tab_changes, 'selected_index' , 'change')  # Tabs
+        view.project.observe(ctrl.when_project_selected, 'value')  # Upload
+        view.skip_txt.observe(ctrl.when_reload, 'value')  # Submission...
         view.delim_ddn.observe(ctrl.when_reload, 'value')
         view.header_ddn.observe(ctrl.when_reload, 'value')
         view.scen_ignore_txt.observe(ctrl.when_reload, 'value')
-        view.model_ddn.observe(ctrl.refresh_submission_preview, 'value')
-        ctrl.col_map_observe(activate=True)
-        
-        # Plausibility
-        ctrl.observe_plot_ddns()
-        
-        # Submit
+        view.model_ddn.observe(ctrl.when_refresh_preview, 'value')
+        ctrl.observe_activate(True, ctrl.col_map, ctrl.when_refresh_preview)
+        ctrl.observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)  # Plausibility
+
         log.info('App running')
     except Exception:
         log.error('start:\n'+traceback.format_exc())
         raise
 
 def when_tab_changes(change):
-    """React to user selecting tab."""
+    """React to user selecting new tab."""
     try:
 
-        if change['new'] + 1 == 1:  # Upload
+        if change['new'] == view.tab_ids[UPLOAD]:
             pass
-        elif change['new'] + 1 == 2:  # Submission
+
+        if change['new'] == view.tab_ids[SUBMISSION]:
             refresh_upload_sample()
             init_assign_columns()
-        elif change['new'] + 1 == 3:  # Integrity
+        
+        elif change['new'] == view.tab_ids[INTEGRITY]:
             ctrl.col_index_map = {i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)} 
             model.analyze(ctrl.col_index_map)  # +1 to skip model
-            refresh_integrity()
-        elif change['new'] + 1 == 4:  # Plausibility
-            apply_fixes()
-            refresh_plot_menus()        
-            plot()
-        else:  # Submit
+
+            # Display analysis results
+
+            # Row counts
+            view.struct_probs_int.value = str(model.num_rows_with_nan )
+            view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
+            view.dupes_int.value = str(model.duplicate_rows)
+            view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - 
+                                          model.num_rows_ignored_scens - model.duplicate_rows )
+
+            # Bad labels
+
+            bad_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (applied automatically)')] 
+
+            for col, lbl, fix in model.bad_labels:
+                bad_grid_widgets += [view.cell(col), view.cell(lbl), view.cell(fix)]
+
+            view.bad_grid.children = bad_grid_widgets
+
+            # Unknown labels
+
+            unknown_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (select from menu)')]
+
+            for col, lbl, match in model.unknown_labels:
+                ddn = view.cell_ddn(DEL if match is None else match, [DEL, OVR] + model.get_valid(col))
+                unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
+
+            view.unknown_grid.children = unknown_grid_widgets 
+
+        elif change['new'] == view.tab_ids[PLAUSIBILITY]:
+            # Apply fixes TODO Remove records with struct problems
+
+            widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
+            ctrl.pending = False
+
+            for i in range(len(widgets)//3):   
+                col, lbl, fix = widgets[i*3].value, widgets[i*3+1].value, widgets[i*3+2].value
+                
+                if fix == OVR:
+                    ctrl.pending = True
+                else:
+                    model.fix(ctrl.col_index_map, col, lbl, fix, fix==DEL)
+
+            # Refresh_plot_menus
+            observe_activate(False, ctrl.plot_ddns, ctrl.when_plot)
+            view.plot_scen_ddn.options = model.get_unique(ctrl.col_index_map, 1)
+            view.plot_reg_ddn.options = model.get_unique(ctrl.col_index_map, 2)
+            view.plot_var_ddn.options = model.get_unique(ctrl.col_index_map, 3)
+            view.plot_scen_ddn.index, view.plot_reg_ddn.index, view.plot_var_ddn.index = 0, 0, 0
+            observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)
+            ctrl.when_plot()
+
+        elif change['new'] == view.tab_ids[FINISH]:
             if ctrl.pending:
                 view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: PENDING REVIEW.' 
             else:
                 view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: ACCEPTED.' 
     
     except Exception:
-        log.error('when_tab_changes:\n'+traceback.format_exc())
+        log.error('when_tab_changes, change={change}:\n'+traceback.format_exc())
         raise
 
 def when_upload_completed(names=None):
@@ -108,10 +153,10 @@ def when_project_selected(_=None):
             model.load_rules(view.project.value)  # Read rules file
 
             # Set model dropdown menu
-            ctrl.col_map_observe(False)
+            ctrl.observe_activate(False, ctrl.col_map, ctrl.when_refresh_preview)
             view.model_ddn.options = model.all_models()
             view.model_ddn.value = view.model_ddn.options[0]
-            ctrl.col_map_observe(True)
+            ctrl.observe_activate(True, ctrl.col_map, ctrl.when_refresh_preview)
         
     except Exception:
         log.error('when_project_selected:\n'+traceback.format_exc())
@@ -160,20 +205,14 @@ def refresh_upload_sample():
         log.error('when_upload_completed:\n'+traceback.format_exc())
         raise
 
-def col_map_observe(activate):
-    """Turn on/off callbacks for column mapping widgets."""
-    try:
-
-        for widget in ctrl.col_map:
-            
-            if activate:
-                widget.observe(ctrl.refresh_submission_preview, 'value')
-            else:
-                widget.unobserve(ctrl.refresh_submission_preview, 'value')
+def observe_activate(activate, widgets, callback):
+    """Turn on/off value callbacks for widgets in given list."""
+    for widget in widgets:
         
-    except Exception:
-        log.error('when_upload_completed:\n'+traceback.format_exc())
-        raise
+        if activate:
+            widget.observe(callback, 'value')
+        else:
+            widget.unobserve(callback, 'value')
 
 def init_assign_columns():
 
@@ -187,7 +226,7 @@ def init_assign_columns():
 
             # Guess selected value TODO Also guess model 
 
-            ctrl.col_map_observe(False)
+            ctrl.observe_activate(False, ctrl.col_map, ctrl.when_refresh_preview)
 
             if model.has_header():
                 # Hdr row: match col names 
@@ -199,11 +238,11 @@ def init_assign_columns():
                 # No hdr row: match value from rules
                 pass  # TODO match cols based on rule file
 
-            ctrl.col_map_observe(True)
+            ctrl.observe_activate(True, ctrl.col_map, ctrl.when_refresh_preview)
 
-        refresh_submission_preview()
+        when_refresh_preview()
 
-def refresh_submission_preview(_=None):
+def when_refresh_preview(_=None):
     """Populate submission preview widgets w/data."""
 
     # Clear sample view widgets
@@ -227,56 +266,8 @@ def refresh_submission_preview(_=None):
                 
                 if mapped_col is not None and len(model.df.iloc[r].values) > mapped_col:
                     view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
-        
-def refresh_integrity():
-    "Display analysis results."
 
-    # Row counts
-    view.struct_probs_int.value = str(model.num_rows_with_nan )
-    view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
-    view.dupes_int.value = str(model.duplicate_rows)
-    view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - model.num_rows_ignored_scens - model.duplicate_rows )
-
-    # Bad labels
-
-    bad_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (applied automatically)')] 
-
-    for col, lbl, fix in model.bad_labels:
-        bad_grid_widgets += [view.cell(col), view.cell(lbl), view.cell(fix)]
-
-    view.bad_grid.children = bad_grid_widgets
-
-    # Unknown labels
-
-    unknown_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (select from menu)')]
-
-    for col, lbl, match in model.unknown_labels:
-        ddn = view.cell_ddn(DEL if match is None else match, [DEL, OVR] + model.get_valid(col))
-        unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
-
-    view.unknown_grid.children = unknown_grid_widgets 
-
-def observe_plot_ddns(active=True):
-    if active:
-        view.plot_scen_ddn.observe(ctrl.plot, 'value')
-        view.plot_reg_ddn.observe(ctrl.plot, 'value')
-        view.plot_var_ddn.observe(ctrl.plot, 'value')
-    else:
-        view.plot_scen_ddn.unobserve(ctrl.plot, 'value')
-        view.plot_reg_ddn.unobserve(ctrl.plot, 'value')
-        view.plot_var_ddn.unobserve(ctrl.plot, 'value')
-
-def refresh_plot_menus():
-    view.plot_scen_ddn.options = model.get_unique(ctrl.col_index_map, 1)
-    view.plot_reg_ddn.options = model.get_unique(ctrl.col_index_map, 2)
-    view.plot_var_ddn.options = model.get_unique(ctrl.col_index_map, 3)
-    observe_plot_ddns(active=False)
-    view.plot_scen_ddn.index = 0
-    view.plot_reg_ddn.index = 0
-    view.plot_var_ddn.index = 0
-    observe_plot_ddns()
-
-def plot(_=None):
+def when_plot(_=None):
     """Display plot."""
     try:
         plot_data = model.select(ctrl.col_index_map, view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
@@ -284,16 +275,3 @@ def plot(_=None):
     except Exception as e:
         view.output_msg(f'(Plot error: "{e}")')  
 
-def apply_fixes():
-    """Edit data based on bad/unknown labels and fixes from integrity check."""
-    # TODO Remove records with struct problems
-    widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
-    ctrl.pending = False
-
-    for i in range(len(widgets)//3):   
-        col, lbl, fix = widgets[i*3].value, widgets[i*3+1].value, widgets[i*3+2].value
-        
-        if fix == OVR:
-            ctrl.pending = True
-        else:
-            model.fix(ctrl.col_index_map, col, lbl, fix, fix==DEL)
