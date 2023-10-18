@@ -1,7 +1,6 @@
 # view.py - User interface for app
 # rcampbel@purdue.edu - 2020-07-14
 import sys
-import traceback
 from IPython.display import display
 from ipywidgets import Accordion,  Dropdown, GridBox, HBox, BoundedIntText, Label, \
                        Layout, Output, HTML, Image, Select, Tab, Text, VBox, Button 
@@ -26,7 +25,7 @@ def start(show_log, when_upload_completed, user_projects):
     view.tabs = Tab(children=[upload_tab(when_upload_completed, user_projects), submission_tab(), 
                               integrity_tab(), plausibility_tab(), submit_tab()],
                     titles=['1. Upload file', '2. Create submission', '3. Check integrity',
-                            '4. Check plausibility', '5. Submit data'])
+                            '4. Check plausibility', '5. Finish up'])
     header = HBox([app_title, logo])
     header.layout.justify_content = 'space-between'
     display(VBox([header, view.tabs]))  # Show app
@@ -152,7 +151,7 @@ def submit_tab():
     "Create widgets for submit data tab content."
     view.submit_desc_lbl = Label(value='-')
     view.submit_btn = Button(description='Submit')
-    content = [section('a) Create submission', [VBox([view.submit_desc_lbl, view.submit_btn])], 'Press the button below to complete the submission process.')]
+    content = [section('a) Confirm submission', [VBox([view.submit_desc_lbl, view.submit_btn])], 'Press the button below to complete the submission process.')]
     view.activity_out = Output()
     content += [section('b) Review submission activity', [view.activity_out], 'Completed submissions are listed below.')]
     return VBox(content)
@@ -178,10 +177,5 @@ def display_plot(data):
 
     with view.plot_area:
         clear_output(wait=True)
-        
-        try:
-            data.plot()
-            plt.show()
-        except Exception as e:
-            log.debug('Exception in plot()...\n'+traceback.format_exc())
-            view.output_msg(f'(Plot error: "{e}")')  # str(e).split(": ")[-1]
+        data.plot()
+        plt.show()

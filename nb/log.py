@@ -26,7 +26,6 @@ class NotebookLoggingHandler(logging.Handler):
         with self.log_output_widget:
             print(self.format(message))
 
-
 log = logging.getLogger(__name__)
 log_handler = NotebookLoggingHandler(logging.INFO)
 log.addHandler(log_handler)
