@@ -1,5 +1,4 @@
-# model.py - Storage access for app
-# rcampbel@purdue.edu - 2020-07-14
+# model.py - Data access, rcampbel@purdue.edu, Oct 2023
 import os
 import csv
 import sys

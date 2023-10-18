@@ -1,5 +1,4 @@
-# view.py - User interface for app
-# rcampbel@purdue.edu - 2020-07-14
+# view.py - User interface, rcampbel@purdue.edu, Oct 2023
 import sys
 from IPython.display import display
 from ipywidgets import Accordion,  Dropdown, GridBox, HBox, BoundedIntText, Label, \
@@ -8,7 +7,7 @@ import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
 from nb.log import log, log_handler
-from nb.config import MOD, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
+from nb.config import MOD, YRS, VAL, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
 
 view = sys.modules[__name__]
 
@@ -169,14 +168,18 @@ def title(text):
     """Create header text for use within grid."""
     return Label(value=text)
 
-def output_msg(text):
-    """Show given text."""
-    display(Label(text))
-
-def display_plot(data):
+def display_plot(df, error=None):
     """Ask data to plot itself then show that plot."""
-
     with view.plot_area:
         clear_output(wait=True)
-        data.plot()
-        plt.show()
+
+        if error is None:
+            _, ax = plt.subplots()
+            df.plot(title='Value Trends', xlabel=YRS, ylabel=VAL, legend=True, grid=True, figsize=(10, 5))
+            ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5)) # Move legend outside plot area
+            plt.show()
+        else:
+            display(Label(error))
+
+
+

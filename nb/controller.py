@@ -1,5 +1,4 @@
-# controller.py - Central logic for app
-# rcampbel@purdue.edu - 2020-07-14
+# controller.py - App logic, rcampbel@purdue.edu, Oct 2023
 import logging
 import os
 import sys
@@ -270,8 +269,8 @@ def when_refresh_preview(_=None):
 def when_plot(_=None):
     """Display plot."""
     try:
-        plot_data = model.select(ctrl.col_index_map, view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
-        view.display_plot(plot_data)
+        series = model.select(ctrl.col_index_map, view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
+        view.display_plot(series)
     except Exception as e:
-        view.output_msg(f'(Plot error: "{e}")')  
+        view.display_plot(None, f'(Plot error: "{e}")')
 

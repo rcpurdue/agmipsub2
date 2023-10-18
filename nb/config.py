@@ -1,6 +1,4 @@
-# config.py - Configuration info for notebook
-# rcampbel@purdue.edu - 2022-01-05
-
+# config.py - Configuration info, rcampbel@purdue.edu, Oct 2023
 from dataclasses import dataclass
 
 UPLOAD = 'Upload file'

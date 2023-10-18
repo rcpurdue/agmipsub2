@@ -1,6 +1,4 @@
-# log.py - Logging for app
-# rcampbel@purdue.edu - 2022-01-05
-
+# log.py - Logging, rcampbel@purdue.edu, Oct 2023
 import logging
 import ipywidgets as widgets
 
