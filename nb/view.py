@@ -7,7 +7,7 @@ import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
 from nb.log import log, log_handler
-from nb.config import MOD, YRS, VAL, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
+from nb.config import MOD, YRS, VAL, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS
 
 view = sys.modules[__name__]
 
@@ -81,7 +81,7 @@ def submission_tab():
         
     # Input preview "grid"
     labels = [Label(layout=Layout(border='1px solid lightgray', padding='0px', margin='0px')) for _ in range(24)]
-    view.inp_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    view.inp_grid = GridBox(children=labels, layout=Layout(grid_template_columns=f'repeat({len(HDR)}, 1fr)', grid_gap='0px'))
 
     content = [section('a) Adjust upload parsing options', widgets + [Label('Sample of parsed data:'), view.inp_grid])]
 
@@ -103,8 +103,8 @@ def submission_tab():
     widgets.insert(1, Label(layout=Layout(width='50px')))
     
     # Output preview "grid"
-    labels = [Label(layout=Layout(border='1px solid lightgray', padding='0px', margin='0px')) for _ in range(3*8)]
-    view.out_grid = GridBox(children=labels, layout=Layout(grid_template_columns='repeat(8, 1fr)', grid_gap='0px'))
+    labels = [Label(layout=Layout(border='1px solid lightgray', padding='0px', margin='0px')) for _ in range(NUM_PREVIEW_ROWS*len(HDR))]
+    view.out_grid = GridBox(children=labels, layout=Layout(grid_template_columns=f'repeat({len(HDR)}, 1fr)', grid_gap='0px'))
 
     content += [section('b) Assign model and columns for submission', 
                         [VBox([HBox(cols), HBox(widgets), Label('Submission preview:'), view.out_grid])])]

@@ -5,7 +5,7 @@ import sys
 from fuzzywuzzy import fuzz, process
 import pandas as pd
 from nb.log import log
-from nb.config import HDR, SCN, REG, VAR, ITM, YRS, VAL  
+from nb.config import HDR, SCN, REG, VAR, ITM, YRS, VAL, NUM_PREVIEW_ROWS  
 
 FIX_TBL_SUFFIX = 'FixTable'
 FIX_COL = 'Fix'
@@ -85,13 +85,13 @@ def ignore_scenarios(ignore, scenario_col=None, remove=False):
 
             if remove:
                 model.df = filtered_df.reset_index(drop=True)
-                model.preview_df = model.df.head(3)
+                model.preview_df = model.df.head(NUM_PREVIEW_ROWS)
             else:
-                model.preview_df = filtered_df.copy().reset_index(drop=True).head(3) 
+                model.preview_df = filtered_df.copy().reset_index(drop=True).head(NUM_PREVIEW_ROWS) 
     
     else:
         model.num_rows_ignored_scens = 0  # Save count for integrity tab
-        model.preview_df = model.df.head(3) 
+        model.preview_df = model.df.head(NUM_PREVIEW_ROWS) 
 
 def has_header():
     return isinstance(model.df.columns[0], str)

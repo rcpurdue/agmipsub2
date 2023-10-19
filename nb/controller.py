@@ -6,7 +6,8 @@ import traceback
 from fuzzywuzzy import fuzz, process
 from nb import model
 from nb import view
-from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
+from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, UPLOAD, SUBMISSION, \
+                      INTEGRITY, PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS 
 from nb.log import log, log_handler
 
 ctrl = sys.modules[__name__]
@@ -183,26 +184,26 @@ def refresh_upload_sample():
     """Populate upload sample widget w/data from preview data."""
     try:
         # Clear sample view widgets
-        for i in range(3*8):
+        for i in range(NUM_PREVIEW_ROWS*len(HDR)):
             view.inp_grid.children[i].value = ''
 
         if model.preview_df is not None:
-            num_data_rows = 3  # Assume no header
+            num_data_rows = NUM_PREVIEW_ROWS  # Assume no header
 
             # Possible header row
             if model.has_header():
-                num_data_rows = 2
+                num_data_rows = NUM_PREVIEW_ROWS - 1
 
-                for i, header in enumerate(model.preview_df.columns[:8]):
+                for i, header in enumerate(model.preview_df.columns[:len(HDR)]):
                     view.inp_grid.children[i].value = header
                     view.inp_grid.children[i].style.font_weight = 'bold'
 
             # Data rows
             for r, row in model.preview_df.head(num_data_rows).iterrows():
 
-                for c, value in enumerate(row[:8]):
-                    view.inp_grid.children[(r+(3-num_data_rows))*8+c].value = str(value)
-                    view.inp_grid.children[(r+(3-num_data_rows))*8+c].style.font_weight = 'normal'
+                for c, value in enumerate(row[:len(HDR)]):
+                    view.inp_grid.children[(r+(NUM_PREVIEW_ROWS-num_data_rows))*len(HDR)+c].value = str(value)
+                    view.inp_grid.children[(r+(NUM_PREVIEW_ROWS-num_data_rows))*len(HDR)+c].style.font_weight = 'normal'
         
     except Exception:
         log.error('when_upload_completed:\n'+traceback.format_exc())
@@ -221,7 +222,7 @@ def init_assign_columns():
     """Set options and selected value of column mapping dropdown menus. """    
     
     if model.df is not None:
-        options = [(str(widget.value), i) for i,widget in enumerate(view.inp_grid.children[0:8])]
+        options = [(str(widget.value), i) for i,widget in enumerate(view.inp_grid.children[0:len(HDR)])]
         text = [tup[0] for tup in options]
         ctrl.observe_activate(False, ctrl.col_ddns, ctrl.when_refresh_preview)
         
@@ -242,9 +243,9 @@ def when_refresh_preview(_=None):
     """Populate submission preview widgets w/data."""
 
     # Clear sample view widgets
-    for i in range(3*8):
+    for i in range(NUM_PREVIEW_ROWS*len(HDR)):
         
-        if i < 8:
+        if i < len(HDR):
             view.out_grid.children[i].value = HDR[i]  
             view.out_grid.children[i].style.font_weight = 'bold'
         else:
@@ -253,11 +254,11 @@ def when_refresh_preview(_=None):
     if model.df is not None:
 
         # Data rows
-        for r in range(1,3):  # Skip header
-            view.out_grid.children[r*8+0].value = str(view.model_ddn.value)  # Model
+        for r in range(1, NUM_PREVIEW_ROWS):  # Skip header
+            view.out_grid.children[r*len(HDR)+0].value = str(view.model_ddn.value)  # Model
 
             for c in range(len(HDR[1:])):  # +1 to skip model  
-                view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, c+1])  
+                view.out_grid.children[r*len(HDR)+c+1].value = str(model.df.iloc[r, c+1])  
 
 def when_plot(_=None):
     """Display plot."""

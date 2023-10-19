@@ -22,6 +22,8 @@ HDR = [MOD, SCN, REG, VAR, ITM, UNI, YRS, VAL]
 DEL = '-DELETE-RECORDS-'
 OVR = '-OVERRIDE-'
 
+NUM_PREVIEW_ROWS = 3
+
 @dataclass
 class Project:
     name: str
