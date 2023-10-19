@@ -4,10 +4,9 @@ import os
 import sys
 import traceback
 from fuzzywuzzy import fuzz, process
-from nb import model
-from nb import view
+from nb import model, view
 from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, UPLOAD, SUBMISSION, \
-                      INTEGRITY, PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS 
+                      INTEGRITY, PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS, COL_DDN_WIDTH 
 from nb.log import log, log_handler
 
 ctrl = sys.modules[__name__]
@@ -62,12 +61,12 @@ def when_tab_changes(change):
         if change['new'] == view.tab_ids[UPLOAD]:
             pass
 
-        if change['new'] == view.tab_ids[SUBMISSION]:
+        if change['new'] == view.tab_ids[SUBMISSION] and model.df is not None:
             refresh_upload_sample()
             init_assign_columns()
             when_refresh_preview()
         
-        elif change['new'] == view.tab_ids[INTEGRITY]:
+        elif change['new'] == view.tab_ids[INTEGRITY] and model.df is not None:
             model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_ddns)})  # +1 to skip model   
             model.analyze()  
 
@@ -99,7 +98,7 @@ def when_tab_changes(change):
 
             view.unknown_grid.children = unknown_grid_widgets 
 
-        elif change['new'] == view.tab_ids[PLAUSIBILITY]:
+        elif change['new'] == view.tab_ids[PLAUSIBILITY] and model.df is not None:
             # Apply fixes TODO Remove records with struct problems
 
             widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
@@ -124,7 +123,7 @@ def when_tab_changes(change):
             observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)
             ctrl.when_plot()
 
-        elif change['new'] == view.tab_ids[FINISH]:
+        elif change['new'] == view.tab_ids[FINISH] and model.df is not None:
             if ctrl.pending:
                 view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: PENDING REVIEW.' 
             else:
@@ -229,7 +228,7 @@ def init_assign_columns():
         for i, ddn in enumerate(ctrl.col_ddns):
             ddn.options = options 
 
-            # Guess selected value TODO When no hdr, match cols based on rule file 
+            # Guess selected value  
             if model.has_header():
                 # Hdr row: match col names 
                 match = process.extractOne(HDR[i+1], text, scorer=fuzz.token_sort_ratio)  # i+1 to skip model
@@ -237,6 +236,10 @@ def init_assign_columns():
                 if match is not None and len(match) > 0:
                     ddn.index = text.index(match[0])
 
+            else:  # TODO Match cols based on rule file
+                ddn.index = i+1
+
+        view.set_width(ctrl.col_ddns, COL_DDN_WIDTH)
         ctrl.observe_activate(True, ctrl.col_ddns, ctrl.when_refresh_preview)
 
 def when_refresh_preview(_=None):
@@ -254,7 +257,7 @@ def when_refresh_preview(_=None):
     if model.df is not None:
 
         # Data rows
-        for r in range(1, NUM_PREVIEW_ROWS):  # Skip header
+        for r in range(1, NUM_PREVIEW_ROWS):  # 1 to skip header
             view.out_grid.children[r*len(HDR)+0].value = str(view.model_ddn.value)  # Model
 
             for c in range(len(HDR[1:])):  # +1 to skip model  
@@ -263,9 +266,10 @@ def when_refresh_preview(_=None):
 def when_plot(_=None):
     """Display plot."""
     try:
+        view.display_plot('Generating plot...')
         series = model.select(view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
         view.display_plot(series)
     except Exception as e:
-        view.display_plot(None, f'(Plot error: "{e}")')
+        view.display_plot(f'Plot error: "{e}"')
         log.error('when_plot:\n'+traceback.format_exc())
 

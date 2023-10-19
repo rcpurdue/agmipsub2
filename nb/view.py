@@ -7,7 +7,8 @@ import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
 from nb.log import log, log_handler
-from nb.config import MOD, YRS, VAL, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS
+from nb.config import MOD, YRS, VAL, HDR, OVR, UPLOAD, SUBMISSION, INTEGRITY, \
+                      PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS, COL_DDN_WIDTH
 
 view = sys.modules[__name__]
 
@@ -95,9 +96,9 @@ def submission_tab():
     view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn = Dropdown(), Dropdown(), Dropdown(), Dropdown()
     cols += [Label(value=col) for col in HDR[1:]]
     widgets += [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn,
-               view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn,view.val_col_ddn]
-    set_width(cols, '140px')
-    set_width(widgets, '140px')
+               view.item_col_ddn, view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn]
+    set_width(cols, COL_DDN_WIDTH)
+    set_width(widgets, COL_DDN_WIDTH)
 
     cols.insert(1, Label(layout=Layout(width='50px')))
     widgets.insert(1, Label(layout=Layout(width='50px')))
@@ -168,18 +169,16 @@ def title(text):
     """Create header text for use within grid."""
     return Label(value=text)
 
-def display_plot(df, error=None):
+def display_plot(data):
     """Ask data to plot itself then show that plot."""
     with view.plot_area:
         clear_output(wait=True)
 
-        if error is None:
+        if type(data) is str:  
+            display(Label(data))
+        else:  # data is a pandas dataframe
             _, ax = plt.subplots()
-            df.plot(title='Value Trends', xlabel=YRS, ylabel=VAL, legend=True, grid=True, figsize=(10, 5))
+            data.plot(title='Value Trends', xlabel=YRS, ylabel=VAL, legend=True, grid=True, figsize=(10, 5))
             ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5)) # Move legend outside plot area
             plt.show()
-        else:
-            display(Label(error))
-
-
 

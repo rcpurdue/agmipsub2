@@ -56,7 +56,7 @@ def read_file(delim=None, skip=0, header='infer', ignore=[]):
 
         # TODO use diff dtype for VAL?
         model.df = pd.read_csv(model.path, sep=delim, dtype='category', skiprows=skip, header=header, keep_default_na=False)
-        log.debug(f'read_file(), category mem...\n{model.df.memory_usage(deep=True)}')
+        # log.debug(f'read_file(), category mem...\n{model.df.memory_usage(deep=True)}')
 
     except Exception:
         model.df, model.delim = None, None

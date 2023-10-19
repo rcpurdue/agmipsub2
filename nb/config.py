@@ -23,6 +23,7 @@ DEL = '-DELETE-RECORDS-'
 OVR = '-OVERRIDE-'
 
 NUM_PREVIEW_ROWS = 3
+COL_DDN_WIDTH = '140px'
 
 @dataclass
 class Project:
