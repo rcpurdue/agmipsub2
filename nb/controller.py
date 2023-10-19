@@ -6,7 +6,7 @@ import traceback
 import difflib
 from nb import model
 from nb import view
-from nb.config import cfg, MOD, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
+from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
 from nb.log import log, log_handler
 
 ctrl = sys.modules[__name__]
@@ -66,10 +66,8 @@ def when_tab_changes(change):
             init_assign_columns()
         
         elif change['new'] == view.tab_ids[INTEGRITY]:
-            ctrl.col_index_map = {i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)}  # +1 to skip model
-            model.set_columns(ctrl.col_index_map)  # Set col headers to enable reference cols by name 
-
-            model.analyze(ctrl.col_index_map)  
+            model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)})  # +1 to skip model   
+            model.analyze()  
 
             # Display analysis results
 
@@ -111,13 +109,15 @@ def when_tab_changes(change):
                 if fix == OVR:
                     ctrl.pending = True
                 else:
-                    model.fix(ctrl.col_index_map, col, lbl, fix, fix==DEL)
+                    model.fix(col, lbl, fix, fix==DEL)
+
+            log.debug(f'AFTER FIX:\n{model.df}')                    
 
             # Refresh_plot_menus
             observe_activate(False, ctrl.plot_ddns, ctrl.when_plot)
-            view.plot_scen_ddn.options = model.get_unique(ctrl.col_index_map, 1)
-            view.plot_reg_ddn.options = model.get_unique(ctrl.col_index_map, 2)
-            view.plot_var_ddn.options = model.get_unique(ctrl.col_index_map, 3)
+            view.plot_scen_ddn.options = model.get_unique(SCN)
+            view.plot_reg_ddn.options = model.get_unique(REG)
+            view.plot_var_ddn.options = model.get_unique(VAR)
             view.plot_scen_ddn.index, view.plot_reg_ddn.index, view.plot_var_ddn.index = 0, 0, 0
             observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)
             ctrl.when_plot()
@@ -271,8 +271,9 @@ def when_refresh_preview(_=None):
 def when_plot(_=None):
     """Display plot."""
     try:
-        series = model.select(ctrl.col_index_map, view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
+        series = model.select(view.plot_scen_ddn.value, view.plot_reg_ddn.value, view.plot_var_ddn.value)
         view.display_plot(series)
     except Exception as e:
         view.display_plot(None, f'(Plot error: "{e}")')
+        log.error('when_plot:\n'+traceback.format_exc())
 

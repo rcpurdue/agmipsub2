@@ -5,7 +5,7 @@ import sys
 from fuzzywuzzy import fuzz, process
 import pandas as pd
 from nb.log import log
-from nb.config import HDR, MOD, ITM, YRS, VAL  
+from nb.config import HDR, SCN, REG, VAR, ITM, YRS, VAL  
 
 FIX_TBL_SUFFIX = 'FixTable'
 FIX_COL = 'Fix'
@@ -55,7 +55,10 @@ def read_file(delim=None, skip=0, header='infer', ignore=[]):
         if not header == 'infer':
             header = skip + 0 if header else None
 
-        model.df = pd.read_csv(model.path, sep=delim, dtype=str, skiprows=skip, header=header, keep_default_na=False)
+        # TODO use diff dtype for VAL?
+        model.df = pd.read_csv(model.path, sep=delim, dtype='category', skiprows=skip, header=header, keep_default_na=False)
+        log.debug(f'read_file(), category mem...\n{model.df.memory_usage(deep=True)}')
+
     except Exception:
         model.df, model.delim = None, None
         raise
@@ -102,7 +105,7 @@ def all_models():
     return list(model.rules['ModelTable']['Model']) 
 
 def set_columns(col_map):
-    """Set column headers based on map, except for model."""
+    """Set column headers, except for model, based on map."""
     hdrs = [''] * len(model.df.columns)
 
     for i in col_map:
@@ -111,44 +114,44 @@ def set_columns(col_map):
     model.df.columns = hdrs
     log.debug(f'set_columns(), col_map={col_map}, columns={model.df.columns}, df: ...\n{model.df}')
 
-def analyze(col_map):
+def analyze():
     "Create row counts, bad label list, unknown label list."
     model.num_rows_with_nan = model.df.isna().any(axis=1).sum()  # Row count: Structural problems
     model.duplicate_rows = model.df.duplicated().sum()  # Row count: Duplicate rows
     model.bad_labels, model.unknown_labels = [], []
 
     # Process output data by column - except values col
-    for i, name in enumerate(HDR[1:7]):  # Each column
-        data = model.df.iloc[:, col_map[i+1]].unique()  # Unique labels in data (+1 to skip model)
-        valid = model.rules[name+'Table'][name]  # Valid labels in rules
+    for col in HDR[1:7]:
+        data = model.df[col].unique()  # Unique labels in data (+1 to skip model)
+        valid = model.rules[col+'Table'][col]  # Valid labels in rules
 
         # Check each invalid label
         for label in list(set(data) - set(valid)):  
             loc, row, fix, match = None, None, None, None  
 
             # Is there a fix from a "fix' table in rules?
-            if name+FIX_TBL_SUFFIX in model.rules.keys():   
-                loc = model.rules[name+FIX_TBL_SUFFIX][name].str.lower() == label.lower()
-                row = model.rules[name+FIX_TBL_SUFFIX][loc]
+            if col+FIX_TBL_SUFFIX in model.rules.keys():   
+                loc = model.rules[col+FIX_TBL_SUFFIX][col].str.lower() == label.lower()
+                row = model.rules[col+FIX_TBL_SUFFIX][loc]
                 fix = list(row[FIX_COL])
 
             # Fix found: add to "bads"
             if (fix is not None) and (len(fix) > 0): 
-                model.bad_labels.append((name, label, fix[0]))  
+                model.bad_labels.append((col, label, fix[0]))  
             
             # No fix found: add to "unkowns"
             else:
                 match = process.extractOne(str(label), valid.tolist(), scorer=fuzz.token_sort_ratio)  # Closest match
                 
                 if match is not None and len(match) > 0:
-                    model.unknown_labels.append((name, label, match[0]))  # Extract match word from tuple   
+                    model.unknown_labels.append((col, label, match[0]))  # Extract match word from tuple   
                 else:
-                    model.unknown_labels.append((name, label, None))  
+                    model.unknown_labels.append((col, label, None))  
 
     # Find fixes for value col
 
-    na_mask = pd.to_numeric(model.df.iloc[:, col_map[7]], errors='coerce').isna()     
-    non_num_unique = model.df.iloc[:, col_map[7]][na_mask].unique()
+    na_mask = pd.to_numeric(model.df[VAL], errors='coerce').isna()     
+    non_num_unique = model.df[VAL][na_mask].unique()
 
     for label in non_num_unique:
         model.bad_labels.append((VAL, label, '0'))  # NOTE Hardcode zero TODO Verify      
@@ -156,28 +159,23 @@ def analyze(col_map):
 def get_valid(col): 
     return sorted(model.rules[col+'Table'][col].tolist())
 
-def get_unique(col_map, out_col_num):
-    return sorted(model.df.iloc[:, col_map[out_col_num]].unique().tolist())
+def get_unique(col):
+    return sorted(model.df[col].unique().tolist())
 
-def fix(col_map, col, lbl, fix, remove_rows):
-    col = col_map[HDR.index(col)]  # Convert col hdr text to col index 
+def fix(col, lbl, fix, remove_rows):
     
     if remove_rows:
-        model.df = model.df[model.df.iloc[:, col] != lbl]
+        model.df = model.df[model.df[col] != lbl]
     else:
-        model.df.iloc[:, col] = model.df.iloc[:, col].replace(lbl, fix)
+        model.df[col] = model.df[col].replace(lbl, fix)
 
-def select(col_map, scn, reg, var):
-    scn_col, reg_col, var_col = col_map[1], col_map[2], col_map[3] 
-    mask = (model.df.iloc[:, scn_col] == scn) & \
-           (model.df.iloc[:, reg_col] == reg) & \
-           (model.df.iloc[:, var_col] == var)
+def select(scn, reg, var):
+    mask = (model.df[SCN] == scn) & (model.df[REG] == reg) & (model.df[VAR] == var)
     subset = model.df[mask].copy(deep=True)
 
     # Change year & value cols to numeric
-    yrs_col, val_col = col_map[6], col_map[7] 
-    subset.iloc[:, yrs_col] = subset.iloc[:, yrs_col].astype(int) 
-    subset.iloc[:, val_col] = subset.iloc[:, val_col].astype(float) 
+    subset[YRS] = subset[YRS].astype(int) 
+    subset[VAL] = subset[VAL].astype(float) 
     
     subset.set_index(YRS, inplace=True)
     return subset.groupby(ITM)[VAL]    
