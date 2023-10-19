@@ -6,7 +6,7 @@ import traceback
 import difflib
 from nb import model
 from nb import view
-from nb.config import cfg, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
+from nb.config import cfg, MOD, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
 from nb.log import log, log_handler
 
 ctrl = sys.modules[__name__]
@@ -66,8 +66,10 @@ def when_tab_changes(change):
             init_assign_columns()
         
         elif change['new'] == view.tab_ids[INTEGRITY]:
-            ctrl.col_index_map = {i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)} 
-            model.analyze(ctrl.col_index_map)  # +1 to skip model
+            ctrl.col_index_map = {i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)}  # +1 to skip model
+            model.set_columns(ctrl.col_index_map)  # Set col headers to enable reference cols by name 
+
+            model.analyze(ctrl.col_index_map)  
 
             # Display analysis results
 

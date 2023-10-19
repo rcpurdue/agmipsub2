@@ -5,12 +5,15 @@ import sys
 from fuzzywuzzy import fuzz, process
 import pandas as pd
 from nb.log import log
-from nb.config import HDR, ITM, YRS, VAL  
+from nb.config import HDR, MOD, ITM, YRS, VAL  
 
 FIX_TBL_SUFFIX = 'FixTable'
 FIX_COL = 'Fix'
 
 model = sys.modules[__name__]
+
+# TODO Add check for min num cols in input data
+# TODO Add feature to guess model
 
 def start():
     """Prep model."""
@@ -24,6 +27,7 @@ def start():
     model.num_rows_ignored_scens = 0
     model.bad_labels = None
     model.unknown_labels = None
+    pd.set_option('display.width', 1000)  # Prevent data desc line breaks (for debug, if nothing else)
 
 def set_file(file_path):
     try:
@@ -96,6 +100,16 @@ def load_rules(project):
 
 def all_models():
     return list(model.rules['ModelTable']['Model']) 
+
+def set_columns(col_map):
+    """Set column headers based on map, except for model."""
+    hdrs = [''] * len(model.df.columns)
+
+    for i in col_map:
+        hdrs[col_map[i]] = HDR[i]
+
+    model.df.columns = hdrs
+    log.debug(f'set_columns(), col_map={col_map}, columns={model.df.columns}, df: ...\n{model.df}')
 
 def analyze(col_map):
     "Create row counts, bad label list, unknown label list."
