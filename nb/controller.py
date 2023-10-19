@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 import traceback
-import difflib
+from fuzzywuzzy import fuzz, process
 from nb import model
 from nb import view
 from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH
@@ -34,7 +34,7 @@ def start(debug=False):
         view.start(debug, when_upload_completed, ctrl.user_projects)
         
         # Keep lists of some UI widgets 
-        ctrl.col_map = [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn, view.item_col_ddn,
+        ctrl.col_ddns = [view.scen_col_ddn, view.reg_col_ddn, view.var_col_ddn, view.item_col_ddn,
                         view.unit_col_ddn, view.year_col_ddn, view.val_col_ddn]
         ctrl.plot_ddns = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn]
 
@@ -46,7 +46,7 @@ def start(debug=False):
         view.header_ddn.observe(ctrl.when_reload, 'value')
         view.scen_ignore_txt.observe(ctrl.when_reload, 'value')
         view.model_ddn.observe(ctrl.when_refresh_preview, 'value')
-        ctrl.observe_activate(True, ctrl.col_map, ctrl.when_refresh_preview)
+        ctrl.observe_activate(True, ctrl.col_ddns, ctrl.when_refresh_preview)
         ctrl.observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)  # Plausibility
 
         log.info('App running')
@@ -64,9 +64,10 @@ def when_tab_changes(change):
         if change['new'] == view.tab_ids[SUBMISSION]:
             refresh_upload_sample()
             init_assign_columns()
+            when_refresh_preview()
         
         elif change['new'] == view.tab_ids[INTEGRITY]:
-            model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_map)})  # +1 to skip model   
+            model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_ddns)})  # +1 to skip model   
             model.analyze()  
 
             # Display analysis results
@@ -154,10 +155,10 @@ def when_project_selected(_=None):
             model.load_rules(view.project.value)  # Read rules file
 
             # Set model dropdown menu
-            ctrl.observe_activate(False, ctrl.col_map, ctrl.when_refresh_preview)
+            ctrl.observe_activate(False, ctrl.col_ddns, ctrl.when_refresh_preview)
             view.model_ddn.options = model.all_models()
-            view.model_ddn.value = view.model_ddn.options[0]
-            ctrl.observe_activate(True, ctrl.col_map, ctrl.when_refresh_preview)
+            view.model_ddn.value = view.model_ddn.options[0]  # TODO Guess model 
+            ctrl.observe_activate(True, ctrl.col_ddns, ctrl.when_refresh_preview)
         
     except Exception:
         log.error('when_project_selected:\n'+traceback.format_exc())
@@ -172,6 +173,7 @@ def when_reload(_=None):
                             ignore=[x.strip() for x in view.scen_ignore_txt.value.split(',')])
             refresh_upload_sample()
             init_assign_columns()
+            when_refresh_preview()
 
     except Exception:
         # TODO set all cells to "ERROR"?
@@ -216,32 +218,25 @@ def observe_activate(activate, widgets, callback):
             widget.unobserve(callback, 'value')
 
 def init_assign_columns():
-
+    """Set options and selected value of column mapping dropdown menus. """    
+    
     if model.df is not None:
-        # Col mapping dropdowns
         options = [(str(widget.value), i) for i,widget in enumerate(view.inp_grid.children[0:8])]
         text = [tup[0] for tup in options]
+        ctrl.observe_activate(False, ctrl.col_ddns, ctrl.when_refresh_preview)
         
-        for i, ddn in enumerate(ctrl.col_map):
+        for i, ddn in enumerate(ctrl.col_ddns):
             ddn.options = options 
 
-            # Guess selected value TODO Also guess model 
-
-            ctrl.observe_activate(False, ctrl.col_map, ctrl.when_refresh_preview)
-
+            # Guess selected value TODO When no hdr, match cols based on rule file 
             if model.has_header():
                 # Hdr row: match col names 
-                match = difflib.get_close_matches(HDR[i+1], text, n=1, cutoff=0.9)  # i+1 to skip model 
+                match = process.extractOne(HDR[i+1], text, scorer=fuzz.token_sort_ratio)  # i+1 to skip model
 
                 if match is not None and len(match) > 0:
                     ddn.index = text.index(match[0])
-            else:
-                # No hdr row: match value from rules
-                pass  # TODO match cols based on rule file
 
-            ctrl.observe_activate(True, ctrl.col_map, ctrl.when_refresh_preview)
-
-        when_refresh_preview()
+        ctrl.observe_activate(True, ctrl.col_ddns, ctrl.when_refresh_preview)
 
 def when_refresh_preview(_=None):
     """Populate submission preview widgets w/data."""
@@ -259,14 +254,10 @@ def when_refresh_preview(_=None):
 
         # Data rows
         for r in range(1,3):  # Skip header
-            view.out_grid.children[r*8+0].value = str(view.model_ddn.value)
+            view.out_grid.children[r*8+0].value = str(view.model_ddn.value)  # Model
 
-            for c in range(0,7):  # Size of col map
-
-                mapped_col = ctrl.col_map[c].value    
-                
-                if mapped_col is not None and len(model.df.iloc[r].values) > mapped_col:
-                    view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, mapped_col])  # +1 to accnt for model  
+            for c in range(len(HDR[1:])):  # +1 to skip model  
+                view.out_grid.children[r*8+c+1].value = str(model.df.iloc[r, c+1])  
 
 def when_plot(_=None):
     """Display plot."""

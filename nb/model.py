@@ -21,7 +21,6 @@ def start():
     model.preview_df = None  # Pandas DataFrame - first few rows of model.df that don't have ignoreed scencarios 
     model.detected_delim = None
     model.path = None
-    model.suspect_scen_col = None
     model.rules = None
     model.num_rows_read = 0
     model.num_rows_ignored_scens = 0
