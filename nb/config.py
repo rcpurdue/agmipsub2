@@ -1,10 +1,10 @@
 # config.py - Configuration info, rcampbel@purdue.edu, Oct 2023
 from dataclasses import dataclass
 
-UPLOAD = 'Upload file'
-SUBMISSION = 'Create submission'
-INTEGRITY = 'Check integrity'
-PLAUSIBILITY = 'Check plausibility'
+UPLOAD = 'Step 1: Upload file'
+SUBMISSION = 'Step 2: Create submission'
+INTEGRITY = 'Step 3: Check integrity'
+PLAUSIBILITY = 'Step 4: Check plausibility'
 FINISH = 'Finish up'
 
 MOD = 'Model'  

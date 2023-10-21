@@ -39,7 +39,7 @@ def start(debug=False):
         ctrl.plot_ddns = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn]
 
         # Setup callbacks NOTE uploader's callback set by view
-        view.tabs.observe(when_tab_changes, 'selected_index' , 'change')  # Tabs
+        view.stack.observe(when_stack_changes, 'selected_index' , 'change')  # Tabs
         view.project.observe(ctrl.when_project_selected, 'value')  # Upload
         view.skip_txt.observe(ctrl.when_reload, 'value')  # Submission...
         view.delim_ddn.observe(ctrl.when_reload, 'value')
@@ -48,25 +48,34 @@ def start(debug=False):
         view.model_ddn.observe(ctrl.when_refresh_preview, 'value')
         ctrl.observe_activate(True, ctrl.col_ddns, ctrl.when_refresh_preview)
         ctrl.observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)  # Plausibility
+        view.next.on_click(when_next)
 
         log.info('App running')
     except Exception:
         log.error('start:\n'+traceback.format_exc())
         raise
 
-def when_tab_changes(change):
+def when_next(_=None):
+    """React to user pressing Next button."""
+
+    if view.stack.selected_index < len(view.steps)-1:
+        view.stack.selected_index += 1
+        view.progress.value = view.stack.selected_index
+        view.progress.description = view.steps[view.stack.selected_index]
+
+def when_stack_changes(change):
     """React to user selecting new tab."""
     try:
 
-        if change['new'] == view.tab_ids[UPLOAD]:
+        if change['new'] == view.steps.index(UPLOAD):
             pass
 
-        if change['new'] == view.tab_ids[SUBMISSION] and model.df is not None:
+        if change['new'] == view.steps.index(SUBMISSION) and model.df is not None:
             refresh_upload_sample()
             init_assign_columns()
             when_refresh_preview()
         
-        elif change['new'] == view.tab_ids[INTEGRITY] and model.df is not None:
+        elif change['new'] == view.steps.index(INTEGRITY) and model.df is not None:
             model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_ddns)})  # +1 to skip model   
             model.analyze()  
 
@@ -98,7 +107,7 @@ def when_tab_changes(change):
 
             view.unknown_grid.children = unknown_grid_widgets 
 
-        elif change['new'] == view.tab_ids[PLAUSIBILITY] and model.df is not None:
+        elif change['new'] == view.steps.index(PLAUSIBILITY) and model.df is not None:
             # Apply fixes TODO Remove records with struct problems
 
             widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
@@ -123,14 +132,14 @@ def when_tab_changes(change):
             observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)
             ctrl.when_plot()
 
-        elif change['new'] == view.tab_ids[FINISH] and model.df is not None:
+        elif change['new'] == view.steps.index(FINISH) and model.df is not None:
             if ctrl.pending:
                 view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: PENDING REVIEW.' 
             else:
                 view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: ACCEPTED.' 
     
     except Exception:
-        log.error('when_tab_changes, change={change}:\n'+traceback.format_exc())
+        log.error('when_stack_changes, change={change}:\n'+traceback.format_exc())
         raise
 
 def when_upload_completed(names=None):

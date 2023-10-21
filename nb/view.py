@@ -2,7 +2,7 @@
 import sys
 from IPython.display import display
 from ipywidgets import Accordion,  Dropdown, GridBox, HBox, BoundedIntText, Label, \
-                       Layout, Output, HTML, Image, Select, Tab, Text, VBox, Button 
+                       Layout, Output, HTML, Image, Select, Text, VBox, Button, Stack, IntProgress
 import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
@@ -16,20 +16,30 @@ def start(show_log, when_upload_completed, user_projects):
     """Build the user interface."""
     display(HTML(filename='nb/custom.html'))  # Send CSS code down to browser    
     app_title = HTML('AgMIP GlobalEcon Data Submission')
-    app_title.add_class('app_title') 
+    # app_title.add_class('app_title') 
 
     with open('nb/logo.png', "rb") as logo_file:
         logo = Image(value=logo_file.read(), format='png', layout={'max_height': '32px'})
 
-    # Create tabs - NOTE Maintain corresponding order of IDs & children! 
-    view.tab_ids = {UPLOAD:0, SUBMISSION:1, INTEGRITY:2, PLAUSIBILITY:3, FINISH:4}
-    view.tabs = Tab(children=[upload_tab(when_upload_completed, user_projects), submission_tab(), 
-                              integrity_tab(), plausibility_tab(), submit_tab()],
-                    titles=[f'{view.tab_ids[title]+1}. {title}' for title in view.tab_ids])
-    
-    header = HBox([app_title, logo])
-    header.layout.justify_content = 'space-between'
-    display(VBox([header, view.tabs]))  # Show app
+    # Create stack - NOTE Maintain corresponding order of IDs & children! 
+    view.steps = [UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH]
+    view.stack = Stack([upload_screen(when_upload_completed, user_projects), submission_screen(), 
+                   integrity_screen(), plausibility_screen(), submit_screen()], selected_index=0)
+    view.restart = Button(description='Start Over')
+    view.next = Button(description='Next Step')
+
+    # TODO 'success', 'info', 'warning', 'danger' or '' - style={'bar_color': 'blue'}
+    view.progress = IntProgress(value=0, min=0, max=len(view.steps)-1, description=view.steps[0], bar_style='info', 
+                                orientation='horizontal')  # style={'description_width': '200px', 'text-align': 'left'}    
+    view.progress.style.description_width = 'initial'
+    set_width([view.progress], width='400px', desc=False)
+
+    header = standard(HBox([app_title, Label(layout=Layout(width='700px')), logo]))
+    # header.layout.justify_content = 'space-between'
+    footer = standard(HBox([view.next, Label(layout=Layout(width='700px')), view.restart]))
+    # footer.layout.justify_content = 'space-between'
+
+    display(VBox([header, view.progress, view.stack, footer]))  # Show app
     log.info('UI build completed')
 
     if show_log:  # Duplicate log lines in log widget (will always show in Jupyter Lab log)
@@ -40,10 +50,14 @@ def section(title, contents, desc=None):
     if desc is not None:
         contents = [HTML(value=desc)] + contents
 
-    ret = Accordion(children=tuple([VBox(contents)]))
+    ret = Accordion(children=tuple([VBox(contents)]))  # TODO , layout=Layout(width='1000px')
     ret.set_title(0, title)
     ret.selected_index = 0
-    return ret
+    return standard(ret)
+
+def standard(widget):        
+    widget.layout.min_width = '1000px'
+    return widget
 
 def set_width(widgets, width='auto', desc=False):
     """Set width for widgets' layouts or descriptions."""
@@ -54,7 +68,7 @@ def set_width(widgets, width='auto', desc=False):
         else:
             widget.layout = Layout(width=width)
 
-def upload_tab(when_upload_completed, user_projects):
+def upload_screen(when_upload_completed, user_projects):
     '''Create widgets for upload tab content.'''
     content = []
     view.uploader = ipyuploads.Upload(accept='*', multiple=False, all_files_complete=when_upload_completed)
@@ -64,7 +78,7 @@ def upload_tab(when_upload_completed, user_projects):
     content.append(section('b) Select project', [view.project]))
     return VBox(content)
 
-def submission_tab():
+def submission_screen():
     '''Create widgets for data tab content.'''
 
     # Upload parsing options
@@ -112,7 +126,7 @@ def submission_tab():
 
     return VBox(content)
 
-def integrity_tab():
+def integrity_screen():
     "Create widgets for integrity tab content."
 
     # Analysis
@@ -137,18 +151,19 @@ def integrity_tab():
     
     return VBox(content)
 
-def plausibility_tab():
+def plausibility_screen():
     "Create widgets for plausibility tab content."
     view.plot_scen_ddn = Dropdown(description='Scenario')
     view.plot_reg_ddn = Dropdown(description='Region')
     view.plot_var_ddn = Dropdown(description='Variable')
     widgets = [view.plot_scen_ddn, view.plot_reg_ddn, view.plot_var_ddn]  
-    set_width(widgets, '400px')
+    set_width(widgets, '300px')
     set_width(widgets, '75px', desc=True)
-    view.plot_area = Output(layout=Layout(border='1px solid lightgray', padding='2px', margin='30px'))
-    return(section('a) Review plots', [VBox([HBox(widgets), view.plot_area])], 'Visualize processed data to verify plausibility.'))
+    view.plot_area = standard(Output(layout=Layout(border='1px solid lightgray', padding='2px', margin='30px')))
+    sec = section('a) Review plots', [VBox([HBox(widgets), view.plot_area])], 'Visualize processed data to verify plausibility.')
+    return(HBox([sec]))
 
-def submit_tab():
+def submit_screen():
     "Create widgets for submit data tab content."
     view.submit_desc_lbl = Label(value='-')
     view.submit_btn = Button(description='Submit')
