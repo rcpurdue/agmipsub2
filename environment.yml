@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - fuzzywuzzy=0.18.0=pyhd8ed1ab_0
   - ipykernel
   - ipywidgets
   - jupyterlab
@@ -11,3 +12,5 @@ dependencies:
   - pandas
   - python=3.8
   - voila
+  - pip:
+      - ipyuploads==0.2.1
