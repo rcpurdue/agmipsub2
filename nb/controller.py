@@ -61,7 +61,7 @@ def when_next(_=None):
     if view.stack.selected_index < len(view.steps)-1:
         view.stack.selected_index += 1
         view.progress.value = view.stack.selected_index
-        view.progress.description = view.steps[view.stack.selected_index]
+        # view.progress.description = view.steps[view.stack.selected_index]
 
 def when_stack_changes(change):
     """React to user selecting new tab."""

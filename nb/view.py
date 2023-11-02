@@ -2,7 +2,7 @@
 import sys
 from IPython.display import display
 from ipywidgets import Accordion,  Dropdown, GridBox, HBox, BoundedIntText, Label, \
-                       Layout, Output, HTML, Image, Select, Text, VBox, Button, Stack, IntProgress
+                       Layout, Output, HTML, Image, Select, Text, VBox, Button, Stack, IntProgress, ToggleButtons
 import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
@@ -28,11 +28,15 @@ def start(show_log, when_upload_completed, user_projects):
     view.restart = Button(description='Start Over')
     view.next = Button(description='Next Step')
 
+    """
     # TODO 'success', 'info', 'warning', 'danger' or '' - style={'bar_color': 'blue'}
     view.progress = IntProgress(value=0, min=0, max=len(view.steps)-1, description=view.steps[0], bar_style='info', 
                                 orientation='horizontal')  # style={'description_width': '200px', 'text-align': 'left'}    
     view.progress.style.description_width = 'initial'
     set_width([view.progress], width='400px', desc=False)
+    """
+
+    view.progress = ToggleButtons(options=view.steps, disabled=True, button_style='') # 'success', 'info', 'warning', 'danger' or ''
 
     header = standard(HBox([app_title, Label(layout=Layout(width='700px')), logo]))
     # header.layout.justify_content = 'space-between'
