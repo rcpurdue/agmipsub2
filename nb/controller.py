@@ -5,7 +5,7 @@ import sys
 import traceback
 from fuzzywuzzy import fuzz, process
 from nb import model, view
-from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, UPLOAD, SUBMISSION, \
+from nb.config import cfg, SCN, REG, VAR, HDR, DEL, OVR, SUBMISSION, \
                       INTEGRITY, PLAUSIBILITY, FINISH, NUM_PREVIEW_ROWS, COL_DDN_WIDTH 
 from nb.log import log, log_handler
 
@@ -48,7 +48,8 @@ def start(debug=False):
         view.model_ddn.observe(ctrl.when_refresh_preview, 'value')
         ctrl.observe_activate(True, ctrl.col_ddns, ctrl.when_refresh_preview)
         ctrl.observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)  # Plausibility
-        view.next.on_click(when_next)
+        view.next_btn.on_click(when_next)
+        view.submit_btn.on_click(when_submit)
 
         log.info('App running')
     except Exception:
@@ -66,77 +67,78 @@ def when_next(_=None):
 def when_stack_changes(change):
     """React to user selecting new tab."""
     try:
+        if model.df is not None:
+            view.adjust_progress(change['new'])
 
-        if change['new'] == view.steps.index(UPLOAD):
-            pass
+            if change['new'] == view.steps.index(SUBMISSION):
+                refresh_upload_sample()
+                init_assign_columns()
+                when_refresh_preview()
+            
+            elif change['new'] == view.steps.index(INTEGRITY):
+                model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_ddns)})  # +1 to skip model   
+                model.analyze()  
 
-        if change['new'] == view.steps.index(SUBMISSION) and model.df is not None:
-            refresh_upload_sample()
-            init_assign_columns()
-            when_refresh_preview()
-        
-        elif change['new'] == view.steps.index(INTEGRITY) and model.df is not None:
-            model.set_columns({i+1:ddn.value for i, ddn in enumerate(ctrl.col_ddns)})  # +1 to skip model   
-            model.analyze()  
+                # Display analysis results
 
-            # Display analysis results
+                # Row counts
+                view.struct_probs_int.value = str(model.num_rows_with_nan )
+                view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
+                view.dupes_int.value = str(model.duplicate_rows)
+                view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - 
+                                            model.num_rows_ignored_scens - model.duplicate_rows )
 
-            # Row counts
-            view.struct_probs_int.value = str(model.num_rows_with_nan )
-            view.ignored_scens_int.value = str(model.num_rows_ignored_scens)
-            view.dupes_int.value = str(model.duplicate_rows)
-            view.accepted_int.value = str(model.num_rows_read - model.num_rows_with_nan - 
-                                          model.num_rows_ignored_scens - model.duplicate_rows )
+                # Bad labels
 
-            # Bad labels
+                bad_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (applied automatically)')] 
 
-            bad_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (applied automatically)')] 
+                for col, lbl, fix in model.bad_labels:
+                    bad_grid_widgets += [view.cell(col), view.cell(lbl), view.cell(fix)]
 
-            for col, lbl, fix in model.bad_labels:
-                bad_grid_widgets += [view.cell(col), view.cell(lbl), view.cell(fix)]
+                view.bad_grid.children = bad_grid_widgets
 
-            view.bad_grid.children = bad_grid_widgets
+                # Unknown labels
 
-            # Unknown labels
+                unknown_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (select from menu)')]
 
-            unknown_grid_widgets = [view.title('Column'), view.title('Label'), view.title('Fix (select from menu)')]
+                for col, lbl, match in model.unknown_labels:
+                    ddn = view.cell_ddn(DEL if match is None else match, [DEL, OVR] + model.get_valid(col))
+                    unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
 
-            for col, lbl, match in model.unknown_labels:
-                ddn = view.cell_ddn(DEL if match is None else match, [DEL, OVR] + model.get_valid(col))
-                unknown_grid_widgets += [view.cell(col), view.cell(lbl), ddn]
+                view.unknown_grid.children = unknown_grid_widgets 
 
-            view.unknown_grid.children = unknown_grid_widgets 
+            elif change['new'] == view.steps.index(PLAUSIBILITY):
+                # Apply fixes TODO Remove records with struct problems
 
-        elif change['new'] == view.steps.index(PLAUSIBILITY) and model.df is not None:
-            # Apply fixes TODO Remove records with struct problems
+                widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
+                ctrl.pending = False
 
-            widgets = view.bad_grid.children[3:] + view.unknown_grid.children[3:]  # 3: skips col headers 
-            ctrl.pending = False
+                for i in range(len(widgets)//3):   
+                    col, lbl, fix = widgets[i*3].value, widgets[i*3+1].value, widgets[i*3+2].value
+                    
+                    if fix == OVR:
+                        ctrl.pending = True
+                    else:
+                        model.fix(col, lbl, fix, fix==DEL)
 
-            for i in range(len(widgets)//3):   
-                col, lbl, fix = widgets[i*3].value, widgets[i*3+1].value, widgets[i*3+2].value
-                
-                if fix == OVR:
-                    ctrl.pending = True
+                log.debug(f'AFTER FIX:\n{model.df}')                    
+
+                # Refresh_plot_menus
+                observe_activate(False, ctrl.plot_ddns, ctrl.when_plot)
+                view.plot_scen_ddn.options = model.get_unique(SCN)
+                view.plot_reg_ddn.options = model.get_unique(REG)
+                view.plot_var_ddn.options = model.get_unique(VAR)
+                view.plot_scen_ddn.index, view.plot_reg_ddn.index, view.plot_var_ddn.index = 0, 0, 0
+                observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)
+                ctrl.when_plot()
+
+            elif change['new'] == view.steps.index(FINISH):
+                view.next_btn.layout.display='none'
+
+                if ctrl.pending:
+                    view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: PENDING REVIEW.' 
                 else:
-                    model.fix(col, lbl, fix, fix==DEL)
-
-            log.debug(f'AFTER FIX:\n{model.df}')                    
-
-            # Refresh_plot_menus
-            observe_activate(False, ctrl.plot_ddns, ctrl.when_plot)
-            view.plot_scen_ddn.options = model.get_unique(SCN)
-            view.plot_reg_ddn.options = model.get_unique(REG)
-            view.plot_var_ddn.options = model.get_unique(VAR)
-            view.plot_scen_ddn.index, view.plot_reg_ddn.index, view.plot_var_ddn.index = 0, 0, 0
-            observe_activate(True, ctrl.plot_ddns, ctrl.when_plot)
-            ctrl.when_plot()
-
-        elif change['new'] == view.steps.index(FINISH) and model.df is not None:
-            if ctrl.pending:
-                view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: PENDING REVIEW.' 
-            else:
-                view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: ACCEPTED.' 
+                    view.submit_desc_lbl.value = f'New data for the "{view.model_ddn.value}" model will be submitted with status: ACCEPTED.' 
     
     except Exception:
         log.error('when_stack_changes, change={change}:\n'+traceback.format_exc())
@@ -282,3 +284,9 @@ def when_plot(_=None):
         view.display_plot(f'Plot error: "{e}"')
         log.error('when_plot:\n'+traceback.format_exc())
 
+def when_submit(_=None):
+    """React to user pressing Submit button."""
+    if ctrl.pending:
+        log.debug('Submit PENDING!')
+    else:
+        log.debug('Submit ACCEPTED!')

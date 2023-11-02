@@ -2,7 +2,7 @@
 import sys
 from IPython.display import display
 from ipywidgets import Accordion,  Dropdown, GridBox, HBox, BoundedIntText, Label, \
-                       Layout, Output, HTML, Image, Select, Text, VBox, Button, Stack, IntProgress, ToggleButtons
+                       Layout, Output, HTML, Image, Select, Text, VBox, Button, Stack
 import ipyuploads
 import matplotlib.pyplot as plt
 from IPython.core.display import clear_output
@@ -21,29 +21,21 @@ def start(show_log, when_upload_completed, user_projects):
     with open('nb/logo.png', "rb") as logo_file:
         logo = Image(value=logo_file.read(), format='png', layout={'max_height': '32px'})
 
-    # Create stack - NOTE Maintain corresponding order of IDs & children! 
     view.steps = [UPLOAD, SUBMISSION, INTEGRITY, PLAUSIBILITY, FINISH]
+
+    # Create stack - NOTE Maintain corresponding order of IDs & children! 
     view.stack = Stack([upload_screen(when_upload_completed, user_projects), submission_screen(), 
                    integrity_screen(), plausibility_screen(), submit_screen()], selected_index=0)
-    view.restart = Button(description='Start Over')
-    view.next = Button(description='Next Step')
+    
+    view.next_btn = Button(description='Next', layout=Layout(margin='15px'))
+    view.progress = [HTML(text, layout=Layout(width='auto', margin='15px')) for text in view.steps]
+    view.adjust_progress(0)
 
-    """
-    # TODO 'success', 'info', 'warning', 'danger' or '' - style={'bar_color': 'blue'}
-    view.progress = IntProgress(value=0, min=0, max=len(view.steps)-1, description=view.steps[0], bar_style='info', 
-                                orientation='horizontal')  # style={'description_width': '200px', 'text-align': 'left'}    
-    view.progress.style.description_width = 'initial'
-    set_width([view.progress], width='400px', desc=False)
-    """
-
-    view.progress = ToggleButtons(options=view.steps, disabled=True, button_style='') # 'success', 'info', 'warning', 'danger' or ''
-
-    header = standard(HBox([app_title, Label(layout=Layout(width='700px')), logo]))
-    # header.layout.justify_content = 'space-between'
-    footer = standard(HBox([view.next, Label(layout=Layout(width='700px')), view.restart]))
-    # footer.layout.justify_content = 'space-between'
-
-    display(VBox([header, view.progress, view.stack, footer]))  # Show app
+    # NOTE Header & footer use blank labels as spacers 
+    header = standard(HBox([app_title, Label(layout=Layout(width='700px')), logo]))  
+    footer = standard(HBox([Label(layout=Layout(width='835px')), view.next_btn]))
+    
+    display(VBox([header, HBox(view.progress), view.stack, footer]))  # Show app
     log.info('UI build completed')
 
     if show_log:  # Duplicate log lines in log widget (will always show in Jupyter Lab log)
@@ -201,3 +193,12 @@ def display_plot(data):
             ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5)) # Move legend outside plot area
             plt.show()
 
+def adjust_progress(selected_index):
+    """Change progress widget to reflect selected step."""
+
+    for i, widget in enumerate(view.progress):
+
+        if i == selected_index:
+            widget.value = '<b><u>'+view.steps[i]+'</u></b>'
+        else:
+            widget.value = view.steps[i]
