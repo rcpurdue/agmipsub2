@@ -9,6 +9,7 @@ dependencies:
   - jupyterlab
   - jupyterthemes
   - matplotlib
+  - openpyxl
   - pandas
   - python=3.8
   - voila
